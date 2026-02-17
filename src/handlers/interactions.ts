@@ -197,6 +197,11 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Backup')
         .setStyle(ButtonStyle.Success);
 
+      const deleteBtn = new ButtonBuilder()
+        .setCustomId(`delete_app_${hostName}_${appId}`)
+        .setLabel('Deletar App')
+        .setStyle(ButtonStyle.Danger);
+
       const backBtn = new ButtonBuilder()
         .setCustomId(`back_host_${hostName}`)
         .setLabel('Voltar')
@@ -204,7 +209,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
 
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
       const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, migrateBtn, backupBtn);
-      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
 
       await interaction.editReply({ 
         components: [container, row1, row2, row3]
@@ -1268,6 +1273,25 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     } catch (error: any) {
       await interaction.editReply({ content: `Erro ao criar backup: ${error.message}` });
     }
+  } else if (action === 'delete' && params[0] === 'app') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    const modal = new ModalBuilder()
+      .setCustomId(`delete_app_confirm_${hostName}_${appId}`)
+      .setTitle('Confirmar Exclusão do App');
+
+    const confirmInput = new TextInputBuilder()
+      .setCustomId('confirm')
+      .setLabel(`Digite "${appId}" para confirmar`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder(appId)
+      .setRequired(true);
+
+    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
   } else if (action === 'logs') {
     const hostName = params[0];
     const appId = params[1];
@@ -1445,6 +1469,42 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       }
     } catch (error: any) {
       await interaction.editReply({ content: `Erro ao migrar: ${error.message}` });
+    }
+  } else if (action === 'delete' && type === 'app' && hostName === 'confirm') {
+    const parts = interaction.customId.split('_');
+    const hostNameValue = parts[3];
+    const appId = parts[4];
+    const confirmText = interaction.fields.getTextInputValue('confirm');
+
+    if (confirmText === appId) {
+      const provider = hostManager.getProvider(hostNameValue);
+      if (!provider) {
+        return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        const result = await provider.delete(appId);
+        
+        if (result.success) {
+          if (notificationManager) {
+            await notificationManager.notify(interaction.user.id, 'statusChange', `App deletado com sucesso\nHost: ${hostNameValue}\nApp ID: ${appId}`);
+          }
+          await interaction.editReply({ 
+            content: `App deletado com sucesso\n\n**Host:** ${hostNameValue}\n**App ID:** \`${appId}\`\n\n${result.message}` 
+          });
+        } else {
+          await interaction.editReply({ content: `Erro ao deletar: ${result.message}` });
+        }
+      } catch (error: any) {
+        await interaction.editReply({ content: `Erro ao deletar app: ${error.message}` });
+      }
+    } else {
+      await interaction.reply({ 
+        content: 'Confirmação incorreta. App não foi deletado.',
+        ephemeral: true 
+      });
     }
   } else if (action === 'config' && type === 'confirm' && hostName === 'delete') {
     const hostToDelete = interaction.customId.split('_')[3];

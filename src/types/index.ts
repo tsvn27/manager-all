@@ -7,6 +7,7 @@ export interface HostProvider {
   restart(appId: string): Promise<ActionResult>;
   getLogs(appId: string): Promise<string>;
   getApps(): Promise<AppInfo[]>;
+  delete(appId: string): Promise<ActionResult>;
 }
 
 export interface DeployResult {

@@ -109,4 +109,19 @@ export class SquareCloudProvider implements HostProvider {
       status: app.isOnline ? 'online' : 'offline'
     }));
   }
+
+  async delete(appId: string): Promise<ActionResult> {
+    try {
+      const response = await this.api.delete(`/apps/${appId}/delete`);
+      return {
+        success: response.data.status === 'success',
+        message: response.data.message || 'App deletado'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao deletar'
+      };
+    }
+  }
 }
