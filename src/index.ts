@@ -2,12 +2,12 @@ import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js'
 import { config } from 'dotenv';
 import { HostManager } from './managers/HostManager.js';
 import { ConfigManager } from './managers/ConfigManager.js';
+import { MonitorManager } from './managers/MonitorManager.js';
 import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
 import * as deploy from './commands/deploy.js';
-import * as configCmd from './commands/config.js';
 
 config();
 
@@ -19,7 +19,7 @@ const hostManager = new HostManager();
 const configManager = new ConfigManager();
 const commands = new Collection();
 
-[panel, deploy, configCmd].forEach(cmd => {
+[panel, deploy].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -33,8 +33,12 @@ if (squarecloudToken && configManager.isHostEnabled('squarecloud')) {
   hostManager.addProvider(new SquareCloudProvider(squarecloudToken));
 }
 
+let monitorManager: MonitorManager;
+
 client.once('ready', async () => {
   console.log(`Bot online: ${client.user?.tag}`);
+  
+  monitorManager = new MonitorManager(client, hostManager, configManager);
   
   const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
   
@@ -58,11 +62,7 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     try {
-      if (interaction.commandName === 'config') {
-        await command.execute(interaction, configManager);
-      } else {
-        await command.execute(interaction, hostManager);
-      }
+      await command.execute(interaction, hostManager);
     } catch (error) {
       console.error(error);
       const reply = { content: 'Erro ao executar comando', ephemeral: true };
@@ -75,7 +75,7 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      await handleInteraction(interaction, hostManager, configManager);
+      await handleInteraction(interaction, hostManager, configManager, monitorManager);
     } catch (error) {
       console.error(error);
     }

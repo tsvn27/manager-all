@@ -17,6 +17,11 @@ interface Config {
       providerClass: string;
     };
   };
+  monitors?: Array<{
+    hostName: string;
+    appId: string;
+    channelId: string;
+  }>;
 }
 
 export class ConfigManager {
@@ -109,5 +114,25 @@ export class ConfigManager {
   removeHost(hostName: string): void {
     delete this.config.hosts[hostName];
     this.saveConfig();
+  }
+
+  addMonitor(hostName: string, appId: string, channelId: string): void {
+    if (!this.config.monitors) {
+      this.config.monitors = [];
+    }
+    this.config.monitors.push({ hostName, appId, channelId });
+    this.saveConfig();
+  }
+
+  removeMonitor(hostName: string, appId: string): void {
+    if (!this.config.monitors) return;
+    this.config.monitors = this.config.monitors.filter(
+      m => !(m.hostName === hostName && m.appId === appId)
+    );
+    this.saveConfig();
+  }
+
+  getMonitors(): Array<{ hostName: string; appId: string; channelId: string }> {
+    return this.config.monitors || [];
   }
 }

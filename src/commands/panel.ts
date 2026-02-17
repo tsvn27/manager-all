@@ -28,7 +28,8 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
 
     return interaction.reply({ 
       components: [container, row],
-      flags: MessageFlags.IsComponentsV2
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true
     });
   }
 
@@ -60,11 +61,17 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
     .setLabel('Configurações')
     .setStyle(ButtonStyle.Secondary);
 
+  const monitorButton = new ButtonBuilder()
+    .setCustomId('open_monitor')
+    .setLabel('Monitoramento')
+    .setStyle(ButtonStyle.Primary);
+
   const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton);
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, monitorButton);
 
   await interaction.reply({ 
     components: [container, row1, row2],
-    flags: MessageFlags.IsComponentsV2
+    flags: MessageFlags.IsComponentsV2,
+    ephemeral: true
   });
 }
