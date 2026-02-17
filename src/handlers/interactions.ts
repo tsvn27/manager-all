@@ -118,7 +118,8 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         components: [container, row1, row2]
       });
     } catch (error: any) {
-      await interaction.editReply({ content: `Erro: ${error.message}` });
+      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido';
+      await interaction.editReply({ content: `Erro ao buscar apps: ${errorMsg}` });
     }
   } else if (action === 'select' && params[0] === 'app') {
     const hostName = params[1];
@@ -215,7 +216,8 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         components: [container, row1, row2, row3]
       });
     } catch (error: any) {
-      await interaction.editReply({ content: `Erro: ${error.message}` });
+      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido';
+      await interaction.editReply({ content: `Erro ao buscar status: ${errorMsg}` });
     }
   }
 }

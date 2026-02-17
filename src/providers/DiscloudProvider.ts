@@ -36,17 +36,21 @@ export class DiscloudProvider implements HostProvider {
   }
 
   async getStatus(appId: string): Promise<AppStatus> {
-    const response = await this.api.get(`/app/${appId}/status`);
-    const app = response.data.apps?.[0] || response.data.app;
+    try {
+      const response = await this.api.get(`/app/${appId}/status`);
+      const app = response.data.apps?.[0] || response.data.app;
 
-    return {
-      id: app.id,
-      name: app.name,
-      status: app.online ? 'online' : 'offline',
-      cpu: app.cpu,
-      ram: app.memory,
-      uptime: app.uptime
-    };
+      return {
+        id: app.id,
+        name: app.name,
+        status: app.online ? 'online' : 'offline',
+        cpu: app.cpu,
+        ram: app.memory,
+        uptime: app.uptime
+      };
+    } catch (error: any) {
+      throw new Error(`Erro ao buscar status: ${error.response?.data?.message || error.message}`);
+    }
   }
 
   async start(appId: string): Promise<ActionResult> {
@@ -95,19 +99,27 @@ export class DiscloudProvider implements HostProvider {
   }
 
   async getLogs(appId: string): Promise<string> {
-    const response = await this.api.get(`/app/${appId}/logs`);
-    return response.data.apps?.logs?.terminal || 'Sem logs';
+    try {
+      const response = await this.api.get(`/app/${appId}/logs`);
+      return response.data.apps?.logs?.terminal || 'Sem logs';
+    } catch (error: any) {
+      throw new Error(`Erro ao buscar logs: ${error.response?.data?.message || error.message}`);
+    }
   }
 
   async getApps(): Promise<AppInfo[]> {
-    const response = await this.api.get('/app/all');
-    const apps = response.data.apps || [];
-    
-    return apps.map((app: any) => ({
-      id: app.id,
-      name: app.name,
-      status: app.online ? 'online' : 'offline'
-    }));
+    try {
+      const response = await this.api.get('/app/all');
+      const apps = response.data.apps || [];
+      
+      return apps.map((app: any) => ({
+        id: app.id,
+        name: app.name,
+        status: app.online ? 'online' : 'offline'
+      }));
+    } catch (error: any) {
+      throw new Error(`Erro ao buscar apps: ${error.response?.data?.message || error.message}`);
+    }
   }
 
   async delete(appId: string): Promise<ActionResult> {
