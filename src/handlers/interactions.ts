@@ -1,4 +1,4 @@
-import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } from 'discord.js';
+import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags, Message, Collection } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
@@ -929,18 +929,18 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       ephemeral: true 
     });
 
-    const filter = (m: any) => m.author.id === interaction.user.id;
+    const filter = (m: Message) => m.author.id === interaction.user.id;
     const collector = interaction.channel?.createMessageCollector({ filter, time: 120000, max: 1 });
 
-    collector?.on('collect', async (message) => {
+    collector?.on('collect', async (message: Message) => {
       const attachment = message.attachments.first();
       const content = message.content.trim();
 
       if (!attachment && !content) {
-        return message.reply({ content: 'Envie um arquivo .zip ou uma URL', ephemeral: true });
+        return message.reply({ content: 'Envie um arquivo .zip ou uma URL' });
       }
 
-      await message.reply({ content: 'Processando...', ephemeral: true });
+      await message.reply({ content: 'Processando...' });
 
       try {
         const axios = (await import('axios')).default;
@@ -949,7 +949,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
 
         if (attachment) {
           if (!attachment.name.endsWith('.zip')) {
-            return message.reply({ content: 'O arquivo deve ser .zip', ephemeral: true });
+            return message.reply({ content: 'O arquivo deve ser .zip' });
           }
           const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
           buffer = Buffer.from(response.data);
@@ -964,14 +964,14 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
           const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
           
           if (needsSquareCloudConfig(buffer)) {
-            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...', ephemeral: true });
+            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
             buffer = await ensureSquareCloudConfig(buffer);
           }
         }
 
         const provider = hostManager.getProvider(hostName);
         if (!provider) {
-          return message.reply({ content: 'Host não encontrada', ephemeral: true });
+          return message.reply({ content: 'Host não encontrada' });
         }
 
         const result = await provider.deploy(buffer, fileName);
@@ -983,19 +983,19 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
           if (notificationManager) {
             await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
           }
-          await message.reply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}`, ephemeral: true });
+          await message.reply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}` });
         } else {
           if (deployHistoryManager) {
             deployHistoryManager.addDeploy(hostName, 'failed', attachment?.url || content, 'failed', result.message, interaction.user.id);
           }
-          await message.reply({ content: `Erro no deploy: ${result.message}`, ephemeral: true });
+          await message.reply({ content: `Erro no deploy: ${result.message}` });
         }
       } catch (error: any) {
-        await message.reply({ content: `Erro: ${error.message}`, ephemeral: true });
+        await message.reply({ content: `Erro: ${error.message}` });
       }
     });
 
-    collector?.on('end', (collected) => {
+    collector?.on('end', (collected: Collection<string, Message>) => {
       if (collected.size === 0) {
         interaction.followUp({ content: 'Tempo esgotado. Use o botão Deploy novamente.', ephemeral: true });
       }
