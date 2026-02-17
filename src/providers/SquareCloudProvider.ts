@@ -18,7 +18,7 @@ export class SquareCloudProvider implements HostProvider {
       const form = new FormData();
       form.append('file', file, filename);
 
-      const response = await this.api.post('/public/upload', form, {
+      const response = await this.api.post('/apps', form, {
         headers: form.getHeaders()
       });
 
@@ -37,7 +37,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async getStatus(appId: string): Promise<AppStatus> {
     try {
-      const response = await this.api.get(`/public/${appId}/status`);
+      const response = await this.api.get(`/apps/${appId}/status`);
       const app = response.data.response;
 
       return {
@@ -55,7 +55,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async start(appId: string): Promise<ActionResult> {
     try {
-      const response = await this.api.post(`/public/${appId}/start`);
+      const response = await this.api.post(`/apps/${appId}/start`);
       return {
         success: response.data.status === 'success',
         message: response.data.message || 'App iniciado'
@@ -70,7 +70,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async stop(appId: string): Promise<ActionResult> {
     try {
-      const response = await this.api.post(`/public/${appId}/stop`);
+      const response = await this.api.post(`/apps/${appId}/stop`);
       return {
         success: response.data.status === 'success',
         message: response.data.message || 'App parado'
@@ -85,7 +85,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async restart(appId: string): Promise<ActionResult> {
     try {
-      const response = await this.api.post(`/public/${appId}/restart`);
+      const response = await this.api.post(`/apps/${appId}/restart`);
       return {
         success: response.data.status === 'success',
         message: response.data.message || 'App reiniciado'
@@ -100,7 +100,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async getLogs(appId: string): Promise<string> {
     try {
-      const response = await this.api.get(`/public/${appId}/logs`);
+      const response = await this.api.get(`/apps/${appId}/logs`);
       return response.data.response?.logs || 'Sem logs';
     } catch (error: any) {
       throw new Error(`Erro ao buscar logs: ${error.response?.data?.message || error.response?.data?.code || error.message}`);
@@ -124,7 +124,7 @@ export class SquareCloudProvider implements HostProvider {
 
   async delete(appId: string): Promise<ActionResult> {
     try {
-      const response = await this.api.delete(`/public/${appId}/delete`);
+      const response = await this.api.delete(`/apps/${appId}`);
       return {
         success: response.data.status === 'success',
         message: response.data.message || 'App deletado'

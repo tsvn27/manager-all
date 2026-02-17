@@ -887,8 +887,37 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       .setPlaceholder('https://exemplo.com/bot.zip')
       .setRequired(true);
 
-    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(urlInput);
-    modal.addComponents(row);
+    const row1 = new ActionRowBuilder<TextInputBuilder>().addComponents(urlInput);
+    modal.addComponents(row1);
+
+    if (hostName === 'squarecloud') {
+      const mainInput = new TextInputBuilder()
+        .setCustomId('main_file')
+        .setLabel('Arquivo principal (deixe vazio para auto)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('index.js')
+        .setRequired(false);
+
+      const memoryInput = new TextInputBuilder()
+        .setCustomId('memory')
+        .setLabel('Memória RAM em MB (deixe vazio para 512)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('512')
+        .setRequired(false);
+
+      const nameInput = new TextInputBuilder()
+        .setCustomId('display_name')
+        .setLabel('Nome do app (deixe vazio para "Bot")')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Meu Bot')
+        .setRequired(false);
+
+      const row2 = new ActionRowBuilder<TextInputBuilder>().addComponents(mainInput);
+      const row3 = new ActionRowBuilder<TextInputBuilder>().addComponents(memoryInput);
+      const row4 = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+      
+      modal.addComponents(row2, row3, row4);
+    }
 
     await interaction.showModal(modal);
   } else if (['start', 'stop', 'restart'].includes(action)) {
@@ -1337,7 +1366,27 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     try {
       const axios = (await import('axios')).default;
       const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
-      const buffer = Buffer.from(response.data);
+      let buffer = Buffer.from(response.data);
+
+      if (hostName === 'squarecloud') {
+        const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
+        
+        if (needsSquareCloudConfig(buffer)) {
+          const mainFile = interaction.fields.getTextInputValue('main_file') || undefined;
+          const memory = interaction.fields.getTextInputValue('memory');
+          const displayName = interaction.fields.getTextInputValue('display_name') || undefined;
+
+          const config = {
+            main: mainFile || 'index.js',
+            memory: memory ? parseInt(memory) : 512,
+            version: 'recommended',
+            displayName: displayName || 'Bot'
+          };
+
+          await interaction.editReply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
+          buffer = await ensureSquareCloudConfig(buffer, config);
+        }
+      }
 
       const result = await provider.deploy(buffer, 'bot.zip');
 
