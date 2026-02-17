@@ -55,6 +55,26 @@ export class ConfigManager {
           displayName: 'SquareCloud',
           documentation: 'https://docs.squarecloud.app',
           providerClass: 'SquareCloudProvider'
+        },
+        sparkedhost: {
+          displayName: 'SparkedHost',
+          documentation: 'https://sparkedhost.com/docs',
+          providerClass: 'SparkedHostProvider'
+        },
+        railway: {
+          displayName: 'Railway',
+          documentation: 'https://docs.railway.app',
+          providerClass: 'RailwayProvider'
+        },
+        replit: {
+          displayName: 'Replit',
+          documentation: 'https://docs.replit.com',
+          providerClass: 'ReplitProvider'
+        },
+        shardcloud: {
+          displayName: 'ShardCloud',
+          documentation: 'https://docs.shardcloud.app',
+          providerClass: 'ShardCloudProvider'
         }
       }
     };
@@ -140,7 +160,6 @@ export class ConfigManager {
   getMonitors(): Array<{ hostName: string; appId: string; channelId: string }> {
     return this.config.monitors || [];
   }
-}
 
   getSetting(key: 'autoBackupBeforeDeploy' | 'maxBackups' | 'backupRetentionDays'): any {
     if (!this.config.settings) {

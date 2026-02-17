@@ -1,17 +1,18 @@
-import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags, Message, Collection } from 'discord.js';
+import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags, Message, Collection, AttachmentBuilder } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
 import { NotificationManager } from '../managers/NotificationManager.js';
 import { MigrationManager } from '../managers/MigrationManager.js';
+import { EnvManager } from '../managers/EnvManager.js';
 
-export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: DeployHistoryManager, notificationManager?: NotificationManager, migrationManager?: MigrationManager) {
+export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: DeployHistoryManager, notificationManager?: NotificationManager, migrationManager?: MigrationManager, envManager?: EnvManager) {
   if (interaction.isStringSelectMenu()) {
     await handleSelectMenu(interaction, hostManager, monitorManager, migrationManager);
   } else if (interaction.isButton()) {
-    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
+    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
   } else if (interaction.isModalSubmit()) {
-    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
+    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
   }
 }
 
@@ -212,6 +213,11 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Logs')
         .setStyle(ButtonStyle.Secondary);
 
+      const varsBtn = new ButtonBuilder()
+        .setCustomId(`vars_manage_${hostName}_${appId}`)
+        .setLabel('Variáveis')
+        .setStyle(ButtonStyle.Primary);
+
       const autoRestartBtn = new ButtonBuilder()
         .setCustomId(`autorestart_toggle_${hostName}_${appId}`)
         .setLabel('Auto-Restart')
@@ -228,7 +234,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, autoRestartBtn);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, varsBtn, autoRestartBtn);
       const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
 
       await interaction.editReply({ 
@@ -243,17 +249,36 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
   }
 }
 
-async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
+async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: EnvManager) {
   const [action, ...params] = interaction.customId.split('_');
 
   if (action === 'quickview') {
     const hostName = params[0];
     const appId = params[1];
     
-    await interaction.reply({ 
-      content: `Visualização rápida não implementada. Use o menu para gerenciar o app.`,
-      ephemeral: true 
-    });
+    const provider = hostManager.getProvider(hostName);
+    if (!provider) {
+      return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const status = await provider.getStatus(appId);
+      
+      const statusEmoji = status.status === 'online' ? '🟢' : '🔴';
+      let message = `${statusEmoji} **${status.name}**\n\n`;
+      message += `Status: ${status.status.toUpperCase()}\n`;
+      message += `ID: \`${status.id}\`\n`;
+      
+      if (status.cpu) message += `CPU: ${status.cpu}\n`;
+      if (status.ram) message += `RAM: ${status.ram}\n`;
+      if (status.uptime) message += `Uptime: ${status.uptime}\n`;
+
+      await interaction.editReply({ content: message });
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro: ${error.message}` });
+    }
     return;
   }
 
@@ -782,6 +807,101 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         components: [container, row1, row2],
         flags: MessageFlags.IsComponentsV2
       });
+    } else if (params[0] === 'app') {
+      const hostName = params[1];
+      const appId = params[2];
+
+      const provider = hostManager.getProvider(hostName);
+      if (!provider) {
+        return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
+      }
+
+      await interaction.deferUpdate();
+
+      try {
+        const status = await provider.getStatus(appId);
+
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`# ${status.name}`)
+          )
+          .addSeparatorComponents(new SeparatorBuilder())
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**Status:** ${status.status === 'online' ? 'ONLINE' : 'OFFLINE'}`),
+            new TextDisplayBuilder().setContent(`**ID:** \`${status.id}\``)
+          );
+
+        if (status.cpu || status.ram || status.uptime) {
+          container.addSeparatorComponents(new SeparatorBuilder().setDivider(false));
+          
+          const metricsText = [];
+          if (status.cpu) metricsText.push(`**CPU:** ${status.cpu}`);
+          if (status.ram) metricsText.push(`**RAM:** ${status.ram}`);
+          if (status.uptime) metricsText.push(`**Uptime:** ${status.uptime}`);
+          
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(metricsText.join('\n'))
+          );
+        }
+
+        container.addSeparatorComponents(new SeparatorBuilder());
+
+        const startBtn = new ButtonBuilder()
+          .setCustomId(`start_${hostName}_${appId}`)
+          .setLabel('Iniciar')
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(status.status === 'online');
+
+        const stopBtn = new ButtonBuilder()
+          .setCustomId(`stop_${hostName}_${appId}`)
+          .setLabel('Parar')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(status.status === 'offline');
+
+        const restartBtn = new ButtonBuilder()
+          .setCustomId(`restart_${hostName}_${appId}`)
+          .setLabel('Reiniciar')
+          .setStyle(ButtonStyle.Primary)
+          .setDisabled(status.status === 'offline');
+
+        const logsBtn = new ButtonBuilder()
+          .setCustomId(`logs_${hostName}_${appId}`)
+          .setLabel('Logs')
+          .setStyle(ButtonStyle.Secondary);
+
+        const varsBtn = new ButtonBuilder()
+          .setCustomId(`vars_manage_${hostName}_${appId}`)
+          .setLabel('Variáveis')
+          .setStyle(ButtonStyle.Primary);
+
+        const autoRestartBtn = new ButtonBuilder()
+          .setCustomId(`autorestart_toggle_${hostName}_${appId}`)
+          .setLabel('Auto-Restart')
+          .setStyle(ButtonStyle.Primary);
+
+        const deleteBtn = new ButtonBuilder()
+          .setCustomId(`delete_app_${hostName}_${appId}`)
+          .setLabel('Deletar')
+          .setStyle(ButtonStyle.Danger);
+
+        const backBtn = new ButtonBuilder()
+          .setCustomId(`back_host_${hostName}`)
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
+        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, varsBtn, autoRestartBtn);
+        const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
+
+        await interaction.editReply({ 
+          content: '',
+          components: [container, row1, row2, row3],
+          flags: MessageFlags.IsComponentsV2
+        });
+      } catch (error: any) {
+        const errorMsg = error.message || 'Erro desconhecido';
+        await interaction.editReply({ content: `Erro ao buscar status: ${errorMsg}` });
+      }
     }
   } else if (action === 'open' && params[0] === 'monitor') {
     if (!monitorManager) {
@@ -1106,6 +1226,96 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       }
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
+    }
+  } else if (action === 'dashboard' && params[0] === 'refresh') {
+    await interaction.deferUpdate();
+
+    try {
+      const providers = hostManager.getAllProviders();
+      
+      if (providers.length === 0) {
+        return interaction.editReply({ content: 'Nenhuma host configurada' });
+      }
+
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('# Dashboard - Visão Geral')
+        )
+        .addSeparatorComponents(new SeparatorBuilder());
+
+      let totalApps = 0;
+      let onlineApps = 0;
+      let offlineApps = 0;
+      let totalCpu = 0;
+      let totalRam = 0;
+      let appsWithMetrics = 0;
+
+      for (const provider of providers) {
+        try {
+          const apps = await provider.getApps();
+          totalApps += apps.length;
+
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${provider.name}** - ${apps.length} apps`)
+          );
+
+          for (const app of apps) {
+            try {
+              const status = await provider.getStatus(app.id);
+              
+              if (status.status === 'online') onlineApps++;
+              else offlineApps++;
+
+              if (status.cpu) {
+                const cpuValue = parseFloat(status.cpu.replace('%', ''));
+                if (!isNaN(cpuValue)) {
+                  totalCpu += cpuValue;
+                  appsWithMetrics++;
+                }
+              }
+              if (status.ram) {
+                const ramMatch = status.ram.match(/(\d+\.?\d*)/);
+                if (ramMatch) {
+                  totalRam += parseFloat(ramMatch[1]);
+                }
+              }
+            } catch (error) {
+            }
+          }
+        } catch (error) {
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${provider.name}** - Erro ao buscar apps`)
+          );
+        }
+      }
+
+      container.addSeparatorComponents(new SeparatorBuilder());
+
+      const avgCpu = appsWithMetrics > 0 ? (totalCpu / appsWithMetrics).toFixed(2) : '0';
+      const avgRam = appsWithMetrics > 0 ? (totalRam / appsWithMetrics).toFixed(2) : '0';
+
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('**Estatísticas Gerais**'),
+        new TextDisplayBuilder().setContent(`Total de Apps: ${totalApps}`),
+        new TextDisplayBuilder().setContent(`Online: ${onlineApps} | Offline: ${offlineApps}`),
+        new TextDisplayBuilder().setContent(`CPU Média: ${avgCpu}%`),
+        new TextDisplayBuilder().setContent(`RAM Média: ${avgRam}MB`)
+      );
+
+      const refreshBtn = new ButtonBuilder()
+        .setCustomId('dashboard_refresh')
+        .setLabel('Atualizar')
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(refreshBtn);
+
+      await interaction.editReply({
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
+      });
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro ao atualizar dashboard: ${error.message}` });
     }
   } else if (action === 'open' && params[0] === 'history') {
     if (!deployHistoryManager) {
@@ -1435,6 +1645,128 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     modal.addComponents(row);
 
     await interaction.showModal(modal);
+  } else if (action === 'vars' && params[0] === 'manage') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    if (!envManager) {
+      return interaction.reply({ content: 'Sistema de variáveis não disponível', ephemeral: true });
+    }
+
+    const vars = envManager.getAllVars(appId);
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Variáveis de Ambiente')
+      )
+      .addSeparatorComponents(new SeparatorBuilder());
+
+    if (vars.length === 0) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('Nenhuma variável configurada')
+      );
+    } else {
+      vars.forEach(v => {
+        const maskedValue = v.value.length > 20 ? v.value.substring(0, 20) + '...' : v.value;
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**${v.key}**`),
+              new TextDisplayBuilder().setContent(`Valor: \`${maskedValue}\``)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId(`vars_delete_${hostName}_${appId}_${v.key}`)
+                .setLabel('Deletar')
+                .setStyle(ButtonStyle.Danger)
+            )
+        );
+      });
+    }
+
+    const addBtn = new ButtonBuilder()
+      .setCustomId(`vars_add_${hostName}_${appId}`)
+      .setLabel('Adicionar Variável')
+      .setStyle(ButtonStyle.Success);
+
+    const exportBtn = new ButtonBuilder()
+      .setCustomId(`vars_export_${hostName}_${appId}`)
+      .setLabel('Exportar .env')
+      .setStyle(ButtonStyle.Primary);
+
+    const backBtn = new ButtonBuilder()
+      .setCustomId(`back_app_${hostName}_${appId}`)
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(addBtn, exportBtn, backBtn);
+
+    await interaction.update({ 
+      content: '',
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
+    });
+  } else if (action === 'vars' && params[0] === 'add') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    const modal = new ModalBuilder()
+      .setCustomId(`vars_add_modal_${hostName}_${appId}`)
+      .setTitle('Adicionar Variável');
+
+    const keyInput = new TextInputBuilder()
+      .setCustomId('key')
+      .setLabel('Nome da Variável')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('TOKEN')
+      .setRequired(true);
+
+    const valueInput = new TextInputBuilder()
+      .setCustomId('value')
+      .setLabel('Valor')
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('seu_valor_aqui')
+      .setRequired(true);
+
+    const row1 = new ActionRowBuilder<TextInputBuilder>().addComponents(keyInput);
+    const row2 = new ActionRowBuilder<TextInputBuilder>().addComponents(valueInput);
+    modal.addComponents(row1, row2);
+
+    await interaction.showModal(modal);
+  } else if (action === 'vars' && params[0] === 'delete') {
+    const hostName = params[1];
+    const appId = params[2];
+    const key = params.slice(3).join('_');
+
+    if (!envManager) {
+      return interaction.reply({ content: 'Sistema de variáveis não disponível', ephemeral: true });
+    }
+
+    envManager.deleteVar(appId, key);
+
+    await updateVarsScreen(interaction, hostName, appId, envManager);
+  } else if (action === 'vars' && params[0] === 'export') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    if (!envManager) {
+      return interaction.reply({ content: 'Sistema de variáveis não disponível', ephemeral: true });
+    }
+
+    const envContent = envManager.generateEnvFile(appId);
+
+    if (!envContent) {
+      return interaction.reply({ content: 'Nenhuma variável para exportar', ephemeral: true });
+    }
+
+    const buffer = Buffer.from(envContent, 'utf-8');
+    const attachment = new AttachmentBuilder(buffer, { name: '.env' });
+
+    await interaction.reply({ 
+      content: 'Arquivo .env gerado',
+      files: [attachment],
+      ephemeral: true 
+    });
   } else if (action === 'autorestart' && params[0] === 'toggle') {
     const hostName = params[1];
     const appId = params[2];
@@ -1524,7 +1856,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setStyle(ButtonStyle.Success);
 
       const backBtn = new ButtonBuilder()
-        .setCustomId(`select_app_${hostName}`)
+        .setCustomId(`back_app_${hostName}_${appId}`)
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
@@ -1560,7 +1892,63 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
   }
 }
 
-async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
+async function updateVarsScreen(interaction: any, hostName: string, appId: string, envManager: EnvManager) {
+  const vars = envManager.getAllVars(appId);
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('# Variáveis de Ambiente')
+    )
+    .addSeparatorComponents(new SeparatorBuilder());
+
+  if (vars.length === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('Nenhuma variável configurada')
+    );
+  } else {
+    vars.forEach(v => {
+      const maskedValue = v.value.length > 20 ? v.value.substring(0, 20) + '...' : v.value;
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${v.key}**`),
+            new TextDisplayBuilder().setContent(`Valor: \`${maskedValue}\``)
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`vars_delete_${hostName}_${appId}_${v.key}`)
+              .setLabel('Deletar')
+              .setStyle(ButtonStyle.Danger)
+          )
+      );
+    });
+  }
+
+  const addBtn = new ButtonBuilder()
+    .setCustomId(`vars_add_${hostName}_${appId}`)
+    .setLabel('Adicionar Variável')
+    .setStyle(ButtonStyle.Success);
+
+  const exportBtn = new ButtonBuilder()
+    .setCustomId(`vars_export_${hostName}_${appId}`)
+    .setLabel('Exportar .env')
+    .setStyle(ButtonStyle.Primary);
+
+  const backBtn = new ButtonBuilder()
+    .setCustomId(`back_app_${hostName}_${appId}`)
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(addBtn, exportBtn, backBtn);
+
+  await interaction.update({ 
+    content: '',
+    components: [container, row],
+    flags: MessageFlags.IsComponentsV2
+  });
+}
+
+async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: EnvManager) {
   const [action, type, hostName] = interaction.customId.split('_');
   
   console.log('Modal recebido:', { customId: interaction.customId, action, type, hostName });
@@ -1590,15 +1978,24 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       const result = filtered.join('\n');
       const truncated = result.length > 1900 ? '...\n' + result.slice(-1900) : result;
       
+      const backBtn = new ButtonBuilder()
+        .setCustomId(`back_app_${hostNameValue}_${appId}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+      
       await interaction.editReply({ 
-        content: `**Logs - Busca: "${searchTerm}"** (${filtered.length} linhas)\n\`\`\`\n${truncated}\n\`\`\`` 
+        content: `**Logs - Busca: "${searchTerm}"** (${filtered.length} linhas)\n\`\`\`\n${truncated}\n\`\`\``,
+        components: [row]
       });
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
     }
   } else if (action === 'autorestart' && type === 'setup') {
-    const hostNameValue = params[2];
-    const appId = params[3];
+    const parts = interaction.customId.split('_');
+    const hostNameValue = parts[2];
+    const appId = parts[3];
     const channelId = interaction.fields.getTextInputValue('channel_id');
 
     if (!monitorManager) {
@@ -1616,6 +2013,74 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
     }
+  } else if (action === 'vars' && type === 'add' && hostName === 'modal') {
+    const parts = interaction.customId.split('_');
+    const hostNameValue = parts[3];
+    const appId = parts[4];
+    const key = interaction.fields.getTextInputValue('key');
+    const value = interaction.fields.getTextInputValue('value');
+
+    if (!envManager) {
+      return interaction.reply({ content: 'Sistema de variáveis não disponível', ephemeral: true });
+    }
+
+    envManager.setVar(appId, key, value);
+
+    await interaction.deferUpdate();
+
+    const vars = envManager.getAllVars(appId);
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Variáveis de Ambiente')
+      )
+      .addSeparatorComponents(new SeparatorBuilder());
+
+    if (vars.length === 0) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('Nenhuma variável configurada')
+      );
+    } else {
+      vars.forEach(v => {
+        const maskedValue = v.value.length > 20 ? v.value.substring(0, 20) + '...' : v.value;
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**${v.key}**`),
+              new TextDisplayBuilder().setContent(`Valor: \`${maskedValue}\``)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId(`vars_delete_${hostNameValue}_${appId}_${v.key}`)
+                .setLabel('Deletar')
+                .setStyle(ButtonStyle.Danger)
+            )
+        );
+      });
+    }
+
+    const addBtn = new ButtonBuilder()
+      .setCustomId(`vars_add_${hostNameValue}_${appId}`)
+      .setLabel('Adicionar Variável')
+      .setStyle(ButtonStyle.Success);
+
+    const exportBtn = new ButtonBuilder()
+      .setCustomId(`vars_export_${hostNameValue}_${appId}`)
+      .setLabel('Exportar .env')
+      .setStyle(ButtonStyle.Primary);
+
+    const backBtn = new ButtonBuilder()
+      .setCustomId(`back_app_${hostNameValue}_${appId}`)
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(addBtn, exportBtn, backBtn);
+
+    await interaction.editReply({ 
+      content: '',
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
+    });
   } else if (action === 'config' && type === 'maxbackups' && hostName === 'modal') {
     const value = parseInt(interaction.fields.getTextInputValue('value'));
     
@@ -1648,15 +2113,24 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     try {
       configManager.setHostToken(hostName, apiToken);
 
-      const { DiscloudProvider } = await import('../providers/DiscloudProvider.js');
-      const { SquareCloudProvider } = await import('../providers/SquareCloudProvider.js');
-
       if (hostName === 'discloud') {
-        const provider = new DiscloudProvider(apiToken);
-        hostManager.addProvider(provider);
+        const { DiscloudProvider } = await import('../providers/DiscloudProvider.js');
+        hostManager.addProvider(new DiscloudProvider(apiToken));
       } else if (hostName === 'squarecloud') {
-        const provider = new SquareCloudProvider(apiToken);
-        hostManager.addProvider(provider);
+        const { SquareCloudProvider } = await import('../providers/SquareCloudProvider.js');
+        hostManager.addProvider(new SquareCloudProvider(apiToken));
+      } else if (hostName === 'sparkedhost') {
+        const { SparkedHostProvider } = await import('../providers/SparkedHostProvider.js');
+        hostManager.addProvider(new SparkedHostProvider(apiToken));
+      } else if (hostName === 'railway') {
+        const { RailwayProvider } = await import('../providers/RailwayProvider.js');
+        hostManager.addProvider(new RailwayProvider(apiToken));
+      } else if (hostName === 'replit') {
+        const { ReplitProvider } = await import('../providers/ReplitProvider.js');
+        hostManager.addProvider(new ReplitProvider(apiToken));
+      } else if (hostName === 'shardcloud') {
+        const { ShardCloudProvider } = await import('../providers/ShardCloudProvider.js');
+        hostManager.addProvider(new ShardCloudProvider(apiToken));
       }
 
       const hostInfo = configManager.getHostInfo(hostName);
@@ -1984,6 +2458,14 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
         const result = await provider.delete(appId);
         
         if (result.success) {
+          if (envManager) {
+            envManager.deleteAllVars(appId);
+          }
+          
+          if (monitorManager && monitorManager.isMonitoring(hostNameValue, appId)) {
+            monitorManager.stopMonitoring(hostNameValue, appId);
+          }
+          
           if (notificationManager) {
             await notificationManager.notify(interaction.user.id, 'statusChange', `App deletado com sucesso\nHost: ${hostNameValue}\nApp ID: ${appId}`);
           }

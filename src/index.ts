@@ -6,11 +6,17 @@ import { MonitorManager } from './managers/MonitorManager.js';
 import { DeployHistoryManager } from './managers/DeployHistoryManager.js';
 import { NotificationManager } from './managers/NotificationManager.js';
 import { MigrationManager } from './managers/MigrationManager.js';
+import { EnvManager } from './managers/EnvManager.js';
 import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
+import { SparkedHostProvider } from './providers/SparkedHostProvider.js';
+import { RailwayProvider } from './providers/RailwayProvider.js';
+import { ReplitProvider } from './providers/ReplitProvider.js';
+import { ShardCloudProvider } from './providers/ShardCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
 import * as deploy from './commands/deploy.js';
+import * as dashboard from './commands/dashboard.js';
 
 config();
 
@@ -21,9 +27,10 @@ const client = new Client({
 const hostManager = new HostManager();
 const configManager = new ConfigManager();
 const deployHistoryManager = new DeployHistoryManager();
+const envManager = new EnvManager();
 const commands = new Collection();
 
-[panel, deploy].forEach(cmd => {
+[panel, deploy, dashboard].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -35,6 +42,26 @@ if (discloudToken && configManager.isHostEnabled('discloud')) {
 const squarecloudToken = configManager.getHostToken('squarecloud');
 if (squarecloudToken && configManager.isHostEnabled('squarecloud')) {
   hostManager.addProvider(new SquareCloudProvider(squarecloudToken));
+}
+
+const sparkedhostToken = configManager.getHostToken('sparkedhost');
+if (sparkedhostToken && configManager.isHostEnabled('sparkedhost')) {
+  hostManager.addProvider(new SparkedHostProvider(sparkedhostToken));
+}
+
+const railwayToken = configManager.getHostToken('railway');
+if (railwayToken && configManager.isHostEnabled('railway')) {
+  hostManager.addProvider(new RailwayProvider(railwayToken));
+}
+
+const replitToken = configManager.getHostToken('replit');
+if (replitToken && configManager.isHostEnabled('replit')) {
+  hostManager.addProvider(new ReplitProvider(replitToken));
+}
+
+const shardcloudToken = configManager.getHostToken('shardcloud');
+if (shardcloudToken && configManager.isHostEnabled('shardcloud')) {
+  hostManager.addProvider(new ShardCloudProvider(shardcloudToken));
 }
 
 let monitorManager: MonitorManager;
@@ -79,7 +106,9 @@ client.on('interactionCreate', async interaction => {
 
     try {
       if (interaction.commandName === 'deploy') {
-        await command.execute(interaction, hostManager, deployHistoryManager, notificationManager);
+        await command.execute(interaction, hostManager, deployHistoryManager, notificationManager, envManager);
+      } else if (interaction.commandName === 'dashboard') {
+        await command.execute(interaction, hostManager);
       } else {
         await command.execute(interaction, hostManager);
       }
@@ -95,7 +124,7 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
+      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
     } catch (error) {
       console.error(error);
     }

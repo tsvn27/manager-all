@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, SlashCommandBuilder, AttachmentBuilder } f
 import { HostManager } from '../managers/HostManager.js';
 import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
 import { NotificationManager } from '../managers/NotificationManager.js';
+import { EnvManager } from '../managers/EnvManager.js';
 import axios from 'axios';
 
 export const data = new SlashCommandBuilder()
@@ -13,7 +14,11 @@ export const data = new SlashCommandBuilder()
       .setRequired(true)
       .addChoices(
         { name: 'Discloud', value: 'discloud' },
-        { name: 'SquareCloud', value: 'squarecloud' }
+        { name: 'SquareCloud', value: 'squarecloud' },
+        { name: 'ShardCloud', value: 'shardcloud' },
+        { name: 'SparkedHost', value: 'sparkedhost' },
+        { name: 'Railway', value: 'railway' },
+        { name: 'Replit', value: 'replit' }
       ))
   .addAttachmentOption(option =>
     option.setName('arquivo')
@@ -24,7 +29,8 @@ export async function execute(
   interaction: ChatInputCommandInteraction, 
   hostManager: HostManager,
   deployHistoryManager?: DeployHistoryManager,
-  notificationManager?: NotificationManager
+  notificationManager?: NotificationManager,
+  envManager?: EnvManager
 ) {
   await interaction.deferReply();
 
@@ -44,6 +50,15 @@ export async function execute(
     const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
     let buffer = Buffer.from(response.data);
 
+    if (envManager) {
+      const { extractEnvVariables } = await import('../utils/zipHelper.js');
+      const envVars = extractEnvVariables(buffer);
+      
+      if (Object.keys(envVars).length > 0) {
+        console.log(`Encontradas ${Object.keys(envVars).length} variáveis de ambiente no .zip`);
+      }
+    }
+
     if (hostName === 'squarecloud') {
       const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
       
@@ -56,13 +71,30 @@ export async function execute(
     const result = await provider.deploy(buffer, attachment.name);
 
     if (result.success) {
+      if (envManager && result.appId) {
+        const { extractEnvVariables } = await import('../utils/zipHelper.js');
+        const envVars = extractEnvVariables(Buffer.from(response.data));
+        
+        Object.entries(envVars).forEach(([key, value]) => {
+          envManager.setVar(result.appId!, key, value);
+        });
+
+        if (Object.keys(envVars).length > 0) {
+          console.log(`Salvas ${Object.keys(envVars).length} variáveis para o app ${result.appId}`);
+        }
+      }
+
       if (deployHistoryManager) {
         deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment.url, 'success', result.message, interaction.user.id);
       }
       if (notificationManager) {
         await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
       }
-      return interaction.editReply(`Deploy realizado com sucesso na ${provider.name}\nApp ID: \`${result.appId}\`\n${result.message}`);
+      
+      const envCount = envManager ? Object.keys((await import('../utils/zipHelper.js')).extractEnvVariables(Buffer.from(response.data))).length : 0;
+      const envMessage = envCount > 0 ? `\n\n${envCount} variáveis de ambiente detectadas e salvas. Use o botão "Variáveis" para gerenciá-las.` : '';
+      
+      return interaction.editReply(`Deploy realizado com sucesso na ${provider.name}\nApp ID: \`${result.appId}\`\n${result.message}${envMessage}`);
     } else {
       if (deployHistoryManager) {
         deployHistoryManager.addDeploy(hostName, 'failed', attachment.url, 'failed', result.message, interaction.user.id);

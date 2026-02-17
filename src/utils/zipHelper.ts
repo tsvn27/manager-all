@@ -111,3 +111,45 @@ export function needsSquareCloudConfig(buffer: Buffer): boolean {
     entry.entryName === 'squarecloud.config'
   );
 }
+
+export function extractEnvVariables(buffer: Buffer): { [key: string]: string } {
+  const zip = new AdmZip(buffer);
+  const entries = zip.getEntries();
+  
+  const envFile = entries.find(e => 
+    e.entryName === '.env' || 
+    e.entryName.endsWith('/.env') ||
+    e.entryName === '.env.example' ||
+    e.entryName.endsWith('/.env.example')
+  );
+
+  if (!envFile || envFile.isDirectory) {
+    return {};
+  }
+
+  const content = envFile.getData().toString('utf-8');
+  const vars: { [key: string]: string } = {};
+
+  content.split('\n').forEach(line => {
+    line = line.trim();
+    
+    if (!line || line.startsWith('#')) {
+      return;
+    }
+
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const key = match[1].trim();
+      let value = match[2].trim();
+      
+      if ((value.startsWith('"') && value.endsWith('"')) || 
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
+      vars[key] = value;
+    }
+  });
+
+  return vars;
+}

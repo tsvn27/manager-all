@@ -4,3 +4,8 @@ dist
 *.log
 config.json
 .vscode
+.env-vars.json
+env-vars.json
+deploy-history.json
+notifications.json
+backups/

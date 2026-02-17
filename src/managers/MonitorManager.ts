@@ -53,6 +53,7 @@ export class MonitorManager {
     }, 60000);
 
     this.intervals.set(key, interval);
+    
     this.configManager.addMonitor(hostName, appId, channelId);
   }
 
@@ -81,7 +82,6 @@ export class MonitorManager {
       const status = await provider.getStatus(appId);
       const currentStatus = status.status;
 
-      // Auto-restart se o app caiu
       if (monitor.autoRestart && monitor.lastStatus === 'online' && currentStatus === 'offline') {
         try {
           await provider.start(appId);
