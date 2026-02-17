@@ -3,21 +3,46 @@ import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
 import { NotificationManager } from '../managers/NotificationManager.js';
+import { MigrationManager } from '../managers/MigrationManager.js';
 
-export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: DeployHistoryManager, notificationManager?: NotificationManager) {
+export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: DeployHistoryManager, notificationManager?: NotificationManager, migrationManager?: MigrationManager) {
   if (interaction.isStringSelectMenu()) {
-    await handleSelectMenu(interaction, hostManager, monitorManager);
+    await handleSelectMenu(interaction, hostManager, monitorManager, migrationManager);
   } else if (interaction.isButton()) {
-    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager);
+    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
   } else if (interaction.isModalSubmit()) {
-    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager);
+    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
   }
 }
 
-async function handleSelectMenu(interaction: any, hostManager: HostManager, monitorManager?: any) {
+async function handleSelectMenu(interaction: any, hostManager: HostManager, monitorManager?: any, migrationManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
-  if (action === 'select' && params[0] === 'host') {
+  if (action === 'migrate' && params[0] === 'select') {
+    const fromHost = params[1];
+    const appId = params[2];
+    const toHost = interaction.values[0];
+
+    if (!migrationManager) {
+      return interaction.reply({ content: 'Sistema de migração não disponível', ephemeral: true });
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(`migrate_confirm_${fromHost}_${toHost}_${appId}`)
+      .setTitle('Confirmar Migração');
+
+    const deleteInput = new TextInputBuilder()
+      .setCustomId('delete_source')
+      .setLabel('Deletar da host original? (sim/não)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('não')
+      .setRequired(true);
+
+    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(deleteInput);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
+  } else if (action === 'select' && params[0] === 'host') {
     const hostName = interaction.values[0];
     const provider = hostManager.getProvider(hostName);
 
@@ -162,16 +187,27 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Logs')
         .setStyle(ButtonStyle.Secondary);
 
+      const migrateBtn = new ButtonBuilder()
+        .setCustomId(`migrate_${hostName}_${appId}`)
+        .setLabel('Migrar')
+        .setStyle(ButtonStyle.Primary);
+
+      const backupBtn = new ButtonBuilder()
+        .setCustomId(`backup_${hostName}_${appId}`)
+        .setLabel('Backup')
+        .setStyle(ButtonStyle.Success);
+
       const backBtn = new ButtonBuilder()
         .setCustomId(`back_host_${hostName}`)
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, backBtn);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, migrateBtn, backupBtn);
+      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
 
       await interaction.editReply({ 
-        components: [container, row1, row2]
+        components: [container, row1, row2, row3]
       });
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
@@ -179,7 +215,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
   }
 }
 
-async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any) {
+async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
   if (action === 'open' && params[0] === 'config') {
@@ -1161,6 +1197,77 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         ephemeral: true 
       });
     }
+  } else if (action === 'migrate') {
+    const hostName = params[0];
+    const appId = params[1];
+
+    if (!migrationManager) {
+      return interaction.reply({ content: 'Sistema de migração não disponível', ephemeral: true });
+    }
+
+    const providers = hostManager.getAllProviders();
+    const otherHosts = providers.filter(p => p.name.toLowerCase() !== hostName);
+
+    if (otherHosts.length === 0) {
+      return interaction.reply({ content: 'Nenhuma outra host configurada para migrar', ephemeral: true });
+    }
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Migrar App'),
+        new TextDisplayBuilder().setContent(`Escolha a host de destino para migrar o app \`${appId}\``)
+      )
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`**Host Atual:** ${hostName}`),
+        new TextDisplayBuilder().setContent(`**App ID:** \`${appId}\``)
+      );
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`migrate_select_${hostName}_${appId}`)
+      .setPlaceholder('Escolha a host de destino')
+      .addOptions(
+        otherHosts.map(p => ({
+          label: p.name,
+          value: p.name.toLowerCase(),
+          description: `Migrar para ${p.name}`
+        }))
+      );
+
+    const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`back_app_${hostName}_${appId}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.update({ 
+      components: [container, row1, row2]
+    });
+  } else if (action === 'backup') {
+    const hostName = params[0];
+    const appId = params[1];
+
+    if (!migrationManager) {
+      return interaction.reply({ content: 'Sistema de backup não disponível', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const result = await migrationManager.backupApp(hostName, appId);
+      
+      if (result.success) {
+        await interaction.editReply({ 
+          content: `Backup criado com sucesso\nArquivo: \`${result.backupPath}\`\n${result.message}` 
+        });
+      } else {
+        await interaction.editReply({ content: result.message });
+      }
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro ao criar backup: ${error.message}` });
+    }
   } else if (action === 'logs') {
     const hostName = params[0];
     const appId = params[1];
@@ -1183,7 +1290,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
   }
 }
 
-async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any) {
+async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
   const [action, type, hostName] = interaction.customId.split('_');
 
   if (action === 'deploy' && type === 'modal') {
@@ -1305,6 +1412,39 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
         content: `Erro ao atualizar canal: ${error.message}`,
         ephemeral: true 
       });
+    }
+  } else if (action === 'migrate' && type === 'confirm') {
+    const parts = interaction.customId.split('_');
+    const fromHost = parts[2];
+    const toHost = parts[3];
+    const appId = parts[4];
+    const deleteSource = interaction.fields.getTextInputValue('delete_source').toLowerCase();
+
+    if (!migrationManager) {
+      return interaction.reply({ content: 'Sistema de migração não disponível', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const shouldDelete = deleteSource === 'sim' || deleteSource === 's' || deleteSource === 'yes' || deleteSource === 'y';
+      
+      await interaction.editReply({ content: 'Iniciando migração... Isso pode levar alguns minutos.' });
+
+      const result = await migrationManager.migrateApp(fromHost, toHost, appId, shouldDelete);
+
+      if (result.success) {
+        if (notificationManager) {
+          await notificationManager.notify(interaction.user.id, 'deploy', `Migração concluída\nDe: ${fromHost}\nPara: ${toHost}\nApp ID: ${appId}`);
+        }
+        await interaction.editReply({ 
+          content: `Migração concluída com sucesso\n\n**De:** ${fromHost}\n**Para:** ${toHost}\n**App ID:** \`${appId}\`\n**Deletado da origem:** ${shouldDelete ? 'Sim' : 'Não'}\n\n${result.message}` 
+        });
+      } else {
+        await interaction.editReply({ content: `Erro na migração: ${result.message}` });
+      }
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro ao migrar: ${error.message}` });
     }
   } else if (action === 'config' && type === 'confirm' && hostName === 'delete') {
     const hostToDelete = interaction.customId.split('_')[3];

@@ -5,6 +5,7 @@ import { ConfigManager } from './managers/ConfigManager.js';
 import { MonitorManager } from './managers/MonitorManager.js';
 import { DeployHistoryManager } from './managers/DeployHistoryManager.js';
 import { NotificationManager } from './managers/NotificationManager.js';
+import { MigrationManager } from './managers/MigrationManager.js';
 import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
@@ -38,12 +39,14 @@ if (squarecloudToken && configManager.isHostEnabled('squarecloud')) {
 
 let monitorManager: MonitorManager;
 let notificationManager: NotificationManager;
+let migrationManager: MigrationManager;
 
 client.once('ready', async () => {
   console.log(`Bot online: ${client.user?.tag}`);
   
   monitorManager = new MonitorManager(client, hostManager, configManager);
   notificationManager = new NotificationManager(client);
+  migrationManager = new MigrationManager(hostManager);
   
   const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
   
@@ -80,7 +83,7 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager);
+      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager);
     } catch (error) {
       console.error(error);
     }
