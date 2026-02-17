@@ -11,12 +11,15 @@ export async function ensureSquareCloudConfig(buffer: Buffer, config?: SquareClo
   const zip = new AdmZip(buffer);
   const entries = zip.getEntries();
   
+  console.log('Verificando arquivos no .zip:', entries.map(e => e.entryName));
+  
   const hasConfig = entries.some(entry => 
     entry.entryName === 'squarecloud.app' || 
     entry.entryName === 'squarecloud.config'
   );
 
   if (hasConfig) {
+    console.log('Arquivo de configuração já existe');
     return buffer;
   }
 
@@ -27,14 +30,21 @@ export async function ensureSquareCloudConfig(buffer: Buffer, config?: SquareClo
     displayName: 'Bot'
   };
 
+  console.log('Criando arquivo de configuração com:', defaultConfig);
+
   const configContent = `MAIN=${defaultConfig.main}
 MEMORY=${defaultConfig.memory}
 VERSION=${defaultConfig.version}
 DISPLAY_NAME=${defaultConfig.displayName}`;
 
+  console.log('Conteúdo do arquivo:', configContent);
+
   zip.addFile('squarecloud.app', Buffer.from(configContent, 'utf-8'));
   
-  return zip.toBuffer();
+  const newBuffer = zip.toBuffer();
+  console.log('Novo .zip criado com tamanho:', newBuffer.length);
+  
+  return newBuffer;
 }
 
 function detectMainFile(entries: AdmZip.IZipEntry[]): string {

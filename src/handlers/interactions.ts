@@ -1,4 +1,4 @@
-import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder } from 'discord.js';
+import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
@@ -63,7 +63,8 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
 
       if (apps.length === 0) {
         container.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('Nenhum app encontrado nesta host')
+          new TextDisplayBuilder().setContent('Nenhum app encontrado nesta host'),
+          new TextDisplayBuilder().setContent('Faça seu primeiro deploy usando o botão abaixo')
         );
       } else {
         apps.forEach(app => {
@@ -111,15 +112,44 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
-      const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+      const row1 = apps.length > 0 ? new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu) : null;
       const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
 
+      const components: any[] = [container];
+      if (row1) components.push(row1);
+      components.push(row2);
+
       await interaction.editReply({ 
-        components: [container, row1, row2]
+        content: '',
+        components,
+        flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido';
-      await interaction.editReply({ content: `Erro ao buscar apps: ${errorMsg}` });
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`# ${provider.name} - Apps`),
+          new TextDisplayBuilder().setContent('Nenhum app encontrado ou erro ao buscar'),
+          new TextDisplayBuilder().setContent('Faça seu primeiro deploy usando o botão abaixo')
+        )
+        .addSeparatorComponents(new SeparatorBuilder());
+
+      const deployButton = new ButtonBuilder()
+        .setCustomId(`deploy_${hostName}`)
+        .setLabel('Deploy')
+        .setStyle(ButtonStyle.Success);
+
+      const backButton = new ButtonBuilder()
+        .setCustomId('back_main')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, backButton);
+
+      await interaction.editReply({ 
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
+      });
     }
   } else if (action === 'select' && params[0] === 'app') {
     const hostName = params[1];
@@ -213,7 +243,9 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
       const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
 
       await interaction.editReply({ 
-        components: [container, row1, row2, row3]
+        content: '',
+        components: [container, row1, row2, row3],
+        flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido';
@@ -277,7 +309,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     );
 
     await interaction.update({ 
-      components: [container, row]
+      content: '',
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'config') {
     if (params[0] === 'manage') {
@@ -342,7 +376,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       }
 
       await interaction.update({ 
-        components: rows
+        content: '',
+        components: rows,
+        flags: MessageFlags.IsComponentsV2
       });
     } else if (params[0] === 'setup' || params[0] === 'edit') {
       const hostName = params[1];
@@ -514,7 +550,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, monitorButton);
 
         return interaction.update({ 
-          components: [container, row]
+          content: '',
+          components: [container, row],
+          flags: MessageFlags.IsComponentsV2
         });
       }
 
@@ -566,7 +604,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(historyButton, notifButton);
 
       await interaction.update({ 
-        components: [container, row1, row2, row3]
+        content: '',
+        components: [container, row1, row2, row3],
+        flags: MessageFlags.IsComponentsV2
       });
     } else if (params[0] === 'host') {
       const hostName = params[1];
@@ -640,7 +680,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
 
       await interaction.editReply({ 
-        components: [container, row1, row2]
+        content: '',
+        components: [container, row1, row2],
+        flags: MessageFlags.IsComponentsV2
       });
     }
   } else if (action === 'open' && params[0] === 'monitor') {
@@ -699,7 +741,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     );
 
     await interaction.update({ 
-      components: [container, row]
+      content: '',
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'monitor') {
     if (params[0] === 'add') {
@@ -782,7 +826,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       );
 
       await interaction.update({ 
-        components: [container, row]
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
       });
     } else if (params[0] === 'edit' && params[1] === 'channel') {
       const hostName = params[2];
@@ -870,56 +916,90 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       );
 
       await interaction.update({ 
-        components: [container, row]
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
       });
     }
   } else if (action === 'deploy') {
     const hostName = params[0];
     
-    const modal = new ModalBuilder()
-      .setCustomId(`deploy_modal_${hostName}`)
-      .setTitle(`Deploy - ${hostName}`);
+    await interaction.reply({ 
+      content: `**Deploy - ${hostName}**\n\nEnvie o arquivo .zip do seu bot como anexo nesta mensagem.\n\nOu responda com a URL do arquivo .zip hospedado.`,
+      ephemeral: true 
+    });
 
-    const urlInput = new TextInputBuilder()
-      .setCustomId('file_url')
-      .setLabel('URL do arquivo .zip')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('https://exemplo.com/bot.zip')
-      .setRequired(true);
+    const filter = (m: any) => m.author.id === interaction.user.id;
+    const collector = interaction.channel?.createMessageCollector({ filter, time: 120000, max: 1 });
 
-    const row1 = new ActionRowBuilder<TextInputBuilder>().addComponents(urlInput);
-    modal.addComponents(row1);
+    collector?.on('collect', async (message) => {
+      const attachment = message.attachments.first();
+      const content = message.content.trim();
 
-    if (hostName === 'squarecloud') {
-      const mainInput = new TextInputBuilder()
-        .setCustomId('main_file')
-        .setLabel('Arquivo principal (deixe vazio para auto)')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('index.js')
-        .setRequired(false);
+      if (!attachment && !content) {
+        return message.reply({ content: 'Envie um arquivo .zip ou uma URL', ephemeral: true });
+      }
 
-      const memoryInput = new TextInputBuilder()
-        .setCustomId('memory')
-        .setLabel('Memória RAM em MB (deixe vazio para 512)')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('512')
-        .setRequired(false);
+      await message.reply({ content: 'Processando...', ephemeral: true });
 
-      const nameInput = new TextInputBuilder()
-        .setCustomId('display_name')
-        .setLabel('Nome do app (deixe vazio para "Bot")')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Meu Bot')
-        .setRequired(false);
+      try {
+        const axios = (await import('axios')).default;
+        let buffer: Buffer;
+        let fileName: string;
 
-      const row2 = new ActionRowBuilder<TextInputBuilder>().addComponents(mainInput);
-      const row3 = new ActionRowBuilder<TextInputBuilder>().addComponents(memoryInput);
-      const row4 = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
-      
-      modal.addComponents(row2, row3, row4);
-    }
+        if (attachment) {
+          if (!attachment.name.endsWith('.zip')) {
+            return message.reply({ content: 'O arquivo deve ser .zip', ephemeral: true });
+          }
+          const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+          buffer = Buffer.from(response.data);
+          fileName = attachment.name;
+        } else {
+          const response = await axios.get(content, { responseType: 'arraybuffer' });
+          buffer = Buffer.from(response.data);
+          fileName = 'bot.zip';
+        }
 
-    await interaction.showModal(modal);
+        if (hostName === 'squarecloud') {
+          const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
+          
+          if (needsSquareCloudConfig(buffer)) {
+            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...', ephemeral: true });
+            buffer = await ensureSquareCloudConfig(buffer);
+          }
+        }
+
+        const provider = hostManager.getProvider(hostName);
+        if (!provider) {
+          return message.reply({ content: 'Host não encontrada', ephemeral: true });
+        }
+
+        const result = await provider.deploy(buffer, fileName);
+
+        if (result.success) {
+          if (deployHistoryManager) {
+            deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment?.url || content, 'success', result.message, interaction.user.id);
+          }
+          if (notificationManager) {
+            await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
+          }
+          await message.reply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}`, ephemeral: true });
+        } else {
+          if (deployHistoryManager) {
+            deployHistoryManager.addDeploy(hostName, 'failed', attachment?.url || content, 'failed', result.message, interaction.user.id);
+          }
+          await message.reply({ content: `Erro no deploy: ${result.message}`, ephemeral: true });
+        }
+      } catch (error: any) {
+        await message.reply({ content: `Erro: ${error.message}`, ephemeral: true });
+      }
+    });
+
+    collector?.on('end', (collected) => {
+      if (collected.size === 0) {
+        interaction.followUp({ content: 'Tempo esgotado. Use o botão Deploy novamente.', ephemeral: true });
+      }
+    });
   } else if (['start', 'stop', 'restart'].includes(action)) {
     const hostName = params[0];
     const appId = params[1];
@@ -1001,7 +1081,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
           const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, backBtn);
 
           await interaction.message.edit({ 
-            components: [container, row1, row2]
+            content: '',
+            components: [container, row1, row2],
+            flags: MessageFlags.IsComponentsV2
           });
         }, 2000);
       } else {
@@ -1061,7 +1143,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     );
 
     await interaction.update({ 
-      components: [container, row]
+      content: '',
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'history') {
     if (params[0] === 'view') {
@@ -1102,7 +1186,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       );
 
       await interaction.update({ 
-        components: [container, row]
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
       });
     } else if (params[0] === 'refresh') {
       if (!deployHistoryManager) {
@@ -1155,7 +1241,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       );
 
       await interaction.update({ 
-        components: [container, row]
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
       });
     }
   } else if (action === 'open' && params[0] === 'notifications') {
@@ -1210,7 +1298,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     );
 
     await interaction.update({ 
-      components: [container, row1, row2]
+      content: '',
+      components: [container, row1, row2],
+      flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'notif') {
     if (params[0] === 'toggle') {
@@ -1284,7 +1374,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     );
 
     await interaction.update({ 
-      components: [container, row1, row2]
+      content: '',
+      components: [container, row1, row2],
+      flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'backup') {
     const hostName = params[0];
@@ -1352,14 +1444,21 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
 
 async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
   const [action, type, hostName] = interaction.customId.split('_');
+  
+  console.log('Modal recebido:', { customId: interaction.customId, action, type, hostName });
 
   if (action === 'deploy' && type === 'modal') {
     const fileUrl = interaction.fields.getTextInputValue('file_url');
+    
+    console.log('Deploy iniciado para:', hostName, 'URL:', fileUrl);
 
     const provider = hostManager.getProvider(hostName);
     if (!provider) {
+      console.log('Provider não encontrado para:', hostName);
       return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
     }
+
+    console.log('Provider encontrado:', provider.name);
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -1367,14 +1466,29 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       const axios = (await import('axios')).default;
       const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
       let buffer = Buffer.from(response.data);
+      
+      console.log('Arquivo baixado, tamanho:', buffer.length, 'bytes');
 
       if (hostName === 'squarecloud') {
+        console.log('É SquareCloud, verificando configuração...');
         const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
         
         if (needsSquareCloudConfig(buffer)) {
-          const mainFile = interaction.fields.getTextInputValue('main_file') || undefined;
-          const memory = interaction.fields.getTextInputValue('memory');
-          const displayName = interaction.fields.getTextInputValue('display_name') || undefined;
+          let mainFile: string | undefined;
+          let memory: string | undefined;
+          let displayName: string | undefined;
+
+          try {
+            mainFile = interaction.fields.getTextInputValue('main_file');
+          } catch (e) {}
+          
+          try {
+            memory = interaction.fields.getTextInputValue('memory');
+          } catch (e) {}
+          
+          try {
+            displayName = interaction.fields.getTextInputValue('display_name');
+          } catch (e) {}
 
           const config = {
             main: mainFile || 'index.js',
@@ -1385,6 +1499,10 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
 
           await interaction.editReply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
           buffer = await ensureSquareCloudConfig(buffer, config);
+          console.log('Arquivo de configuração criado:', config);
+          await interaction.editReply({ content: 'Arquivo de configuração criado. Enviando para SquareCloud...' });
+        } else {
+          console.log('Arquivo de configuração já existe no .zip');
         }
       }
 
@@ -1485,7 +1603,9 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       }
 
       await interaction.update({ 
-        components: rows
+        content: '',
+        components: rows,
+        flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
       await interaction.reply({ 
@@ -1553,7 +1673,9 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       );
 
       await interaction.update({ 
-        components: [container, row]
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
       await interaction.reply({ 
@@ -1621,7 +1743,9 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
         );
 
         await interaction.update({ 
-          components: [container, row]
+          content: '',
+          components: [container, row],
+          flags: MessageFlags.IsComponentsV2
         });
       }
     } catch (error: any) {
@@ -1681,7 +1805,9 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
         );
 
         await interaction.update({ 
-          components: [container, row]
+          content: '',
+          components: [container, row],
+          flags: MessageFlags.IsComponentsV2
         });
       }
     } catch (error: any) {

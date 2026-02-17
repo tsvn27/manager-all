@@ -10,7 +10,6 @@ import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
-import * as deploy from './commands/deploy.js';
 
 config();
 
@@ -23,7 +22,7 @@ const configManager = new ConfigManager();
 const deployHistoryManager = new DeployHistoryManager();
 const commands = new Collection();
 
-[panel, deploy].forEach(cmd => {
+[panel].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -51,6 +50,14 @@ client.once('ready', async () => {
   const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
   
   try {
+    console.log('Limpando comandos antigos...');
+    
+    await rest.put(
+      Routes.applicationCommands(client.user!.id),
+      { body: [] }
+    );
+    
+    console.log('Comandos antigos removidos');
     console.log('Registrando comandos...');
     
     await rest.put(
