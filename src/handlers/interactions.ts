@@ -1373,9 +1373,68 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
         hostManager.addProvider(provider);
       }
 
-      await interaction.reply({ 
-        content: `${hostName.charAt(0).toUpperCase() + hostName.slice(1)} configurada com sucesso`,
-        ephemeral: true 
+      const hostInfo = configManager.getHostInfo(hostName);
+      const isConfigured = !!configManager.getHostToken(hostName);
+      const isEnabled = configManager.isHostEnabled(hostName);
+
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`# Gerenciar ${hostInfo?.displayName || hostName}`),
+          new TextDisplayBuilder().setContent(`Token configurado com sucesso`)
+        )
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**Status:** ${isConfigured ? (isEnabled ? 'Ativa' : 'Desativada') : 'Não Configurada'}`),
+          new TextDisplayBuilder().setContent(`**Documentação:** ${hostInfo?.documentation || 'N/A'}`)
+        );
+
+      const buttons = [];
+
+      if (isConfigured) {
+        buttons.push(
+          new ButtonBuilder()
+            .setCustomId(`config_edit_${hostName}`)
+            .setLabel('Editar Token')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`config_toggle_${hostName}`)
+            .setLabel(isEnabled ? 'Desativar' : 'Ativar')
+            .setStyle(isEnabled ? ButtonStyle.Secondary : ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`config_remove_${hostName}`)
+            .setLabel('Remover')
+            .setStyle(ButtonStyle.Danger)
+        );
+      } else {
+        buttons.push(
+          new ButtonBuilder()
+            .setCustomId(`config_setup_${hostName}`)
+            .setLabel('Configurar Token')
+            .setStyle(ButtonStyle.Success)
+        );
+      }
+
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`config_delete_host_${hostName}`)
+          .setLabel('Deletar Host')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId('open_config')
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(0, Math.min(5, buttons.length)));
+      const rows: any[] = [container, row1];
+      
+      if (buttons.length > 5) {
+        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(5));
+        rows.push(row2);
+      }
+
+      await interaction.update({ 
+        components: rows
       });
     } catch (error: any) {
       await interaction.reply({ 
@@ -1392,9 +1451,58 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     try {
       configManager.addAvailableHost(hostNameInput, displayName, documentation, providerClass);
 
-      await interaction.reply({ 
-        content: `Host ${displayName} adicionada com sucesso\nDocumentação: ${documentation}`,
-        ephemeral: true 
+      const hosts = configManager.getAllHosts();
+
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('# Configuração de Hosts'),
+          new TextDisplayBuilder().setContent(`Host ${displayName} adicionada com sucesso`)
+        )
+        .addSeparatorComponents(new SeparatorBuilder());
+
+      if (hosts.length === 0) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('Nenhuma host disponível. Adicione uma nova host.')
+        );
+      } else {
+        hosts.forEach(host => {
+          const status = host.configured 
+            ? (host.enabled ? 'Configurada e Ativa' : 'Configurada e Desativada')
+            : 'Não Configurada';
+          
+          container.addSectionComponents(
+            new SectionBuilder()
+              .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`**${host.displayName}**`),
+                new TextDisplayBuilder().setContent(`Status: ${status}`)
+              )
+              .setButtonAccessory(
+                new ButtonBuilder()
+                  .setCustomId(`config_manage_${host.name}`)
+                  .setLabel('Gerenciar')
+                  .setStyle(ButtonStyle.Primary)
+              )
+          );
+        });
+      }
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('config_refresh')
+          .setLabel('Atualizar')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('config_add_host')
+          .setLabel('Adicionar Host')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('back_main')
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.update({ 
+        components: [container, row]
       });
     } catch (error: any) {
       await interaction.reply({ 
@@ -1410,9 +1518,59 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     try {
       if (monitorManager) {
         monitorManager.startMonitoring(hostNameInput, appId, channelId);
-        await interaction.reply({ 
-          content: `Monitoramento iniciado para ${hostNameInput}/${appId}`,
-          ephemeral: true 
+        
+        const monitoredApps = monitorManager.getMonitoredApps();
+
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent('# Monitoramento de Apps'),
+            new TextDisplayBuilder().setContent(`Monitoramento iniciado para ${hostNameInput}/${appId}`)
+          )
+          .addSeparatorComponents(new SeparatorBuilder());
+
+        if (monitoredApps.length === 0) {
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent('Nenhum app sendo monitorado')
+          );
+        } else {
+          monitoredApps.forEach((app: any) => {
+            const provider = hostManager.getProvider(app.hostName);
+            const statusText = app.lastStatus === 'online' ? 'Online' : 
+                              app.lastStatus === 'offline' ? 'Offline' : 'Desconhecido';
+            
+            container.addSectionComponents(
+              new SectionBuilder()
+                .addTextDisplayComponents(
+                  new TextDisplayBuilder().setContent(`**${provider?.name || app.hostName}**`),
+                  new TextDisplayBuilder().setContent(`App ID: \`${app.appId}\`\nStatus: ${statusText}\nCanal: <#${app.channelId}>`)
+                )
+                .setButtonAccessory(
+                  new ButtonBuilder()
+                    .setCustomId(`monitor_manage_${app.hostName}_${app.appId}`)
+                    .setLabel('Gerenciar')
+                    .setStyle(ButtonStyle.Primary)
+                )
+            );
+          });
+        }
+
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('monitor_add')
+            .setLabel('Adicionar Monitoramento')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('monitor_refresh')
+            .setLabel('Atualizar')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('back_main')
+            .setLabel('Voltar')
+            .setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.update({ 
+          components: [container, row]
         });
       }
     } catch (error: any) {
@@ -1431,9 +1589,48 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       if (monitorManager) {
         monitorManager.stopMonitoring(hostNameValue, appId);
         monitorManager.startMonitoring(hostNameValue, appId, newChannelId);
-        await interaction.reply({ 
-          content: `Canal de notificações atualizado para <#${newChannelId}>`,
-          ephemeral: true 
+        
+        const monitoredApps = monitorManager.getMonitoredApps();
+        const app = monitoredApps.find((a: any) => a.hostName === hostNameValue && a.appId === appId);
+
+        if (!app) {
+          return interaction.reply({ content: 'App não encontrado no monitoramento', ephemeral: true });
+        }
+
+        const provider = hostManager.getProvider(app.hostName);
+        const statusText = app.lastStatus === 'online' ? 'Online' : 
+                          app.lastStatus === 'offline' ? 'Offline' : 'Desconhecido';
+
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`# Gerenciar Monitoramento`),
+            new TextDisplayBuilder().setContent(`Canal atualizado para <#${newChannelId}>`)
+          )
+          .addSeparatorComponents(new SeparatorBuilder())
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**Host:** ${provider?.name || app.hostName}`),
+            new TextDisplayBuilder().setContent(`**App ID:** \`${app.appId}\``),
+            new TextDisplayBuilder().setContent(`**Status Atual:** ${statusText}`),
+            new TextDisplayBuilder().setContent(`**Canal de Notificações:** <#${app.channelId}>`)
+          );
+
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`monitor_edit_channel_${hostNameValue}_${appId}`)
+            .setLabel('Editar Canal')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`monitor_stop_${hostNameValue}_${appId}`)
+            .setLabel('Parar Monitoramento')
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId('open_monitor')
+            .setLabel('Voltar')
+            .setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.update({ 
+          components: [container, row]
         });
       }
     } catch (error: any) {
