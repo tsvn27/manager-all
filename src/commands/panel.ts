@@ -71,11 +71,22 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
     .setLabel('Monitoramento')
     .setStyle(ButtonStyle.Primary);
 
+  const historyButton = new ButtonBuilder()
+    .setCustomId('open_history')
+    .setLabel('Histórico')
+    .setStyle(ButtonStyle.Secondary);
+
+  const notifButton = new ButtonBuilder()
+    .setCustomId('open_notifications')
+    .setLabel('Notificações')
+    .setStyle(ButtonStyle.Secondary);
+
   const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, monitorButton);
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(historyButton, notifButton);
 
   await interaction.reply({ 
-    components: [container, row1, row2],
+    components: [container, row1, row2, row3],
     flags: MessageFlags.IsComponentsV2,
     ephemeral: true
   });

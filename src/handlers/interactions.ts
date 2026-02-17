@@ -1,14 +1,16 @@
 import { Interaction, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
+import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
+import { NotificationManager } from '../managers/NotificationManager.js';
 
-export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any) {
+export async function handleInteraction(interaction: Interaction, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: DeployHistoryManager, notificationManager?: NotificationManager) {
   if (interaction.isStringSelectMenu()) {
     await handleSelectMenu(interaction, hostManager, monitorManager);
   } else if (interaction.isButton()) {
-    await handleButton(interaction, hostManager, configManager, monitorManager);
+    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager);
   } else if (interaction.isModalSubmit()) {
-    await handleModal(interaction, hostManager, configManager, monitorManager);
+    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager);
   }
 }
 
@@ -23,7 +25,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
       return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
     }
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     try {
       const apps = await provider.getApps();
@@ -106,7 +108,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
       return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
     }
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     try {
       const status = await provider.getStatus(appId);
@@ -177,7 +179,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
   }
 }
 
-async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any) {
+async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
   if (action === 'open' && params[0] === 'config') {
@@ -501,11 +503,22 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setLabel('Monitoramento')
         .setStyle(ButtonStyle.Primary);
 
+      const historyButton = new ButtonBuilder()
+        .setCustomId('open_history')
+        .setLabel('Histórico')
+        .setStyle(ButtonStyle.Secondary);
+
+      const notifButton = new ButtonBuilder()
+        .setCustomId('open_notifications')
+        .setLabel('Notificações')
+        .setStyle(ButtonStyle.Secondary);
+
       const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
       const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, monitorButton);
+      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(historyButton, notifButton);
 
       await interaction.update({ 
-        components: [container, row1, row2]
+        components: [container, row1, row2, row3]
       });
     } else if (params[0] === 'host') {
       const hostName = params[1];
@@ -584,7 +597,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     }
   } else if (action === 'open' && params[0] === 'monitor') {
     if (!monitorManager) {
-      return interaction.update({ content: 'Monitoramento não disponível' });
+      return interaction.update({ content: 'Monitoramento não disponível', ephemeral: true });
     }
 
     const monitoredApps = monitorManager.getMonitoredApps();
@@ -755,7 +768,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       }
     } else if (params[0] === 'refresh') {
       if (!monitorManager) {
-        return interaction.update({ content: 'Monitoramento não disponível' });
+        return interaction.update({ content: 'Monitoramento não disponível', ephemeral: true });
       }
 
       const monitoredApps = monitorManager.getMonitoredApps();
@@ -920,6 +933,234 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
     }
+  } else if (action === 'open' && params[0] === 'history') {
+    if (!deployHistoryManager) {
+      return interaction.update({ content: 'Histórico não disponível', ephemeral: true });
+    }
+
+    const history = deployHistoryManager.getHistory(undefined, undefined, 15);
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Histórico de Deploys'),
+        new TextDisplayBuilder().setContent('Últimos 15 deploys realizados')
+      )
+      .addSeparatorComponents(new SeparatorBuilder());
+
+    if (history.length === 0) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('Nenhum deploy registrado ainda')
+      );
+    } else {
+      history.forEach((deploy: any) => {
+        const date = new Date(deploy.timestamp);
+        const statusEmoji = deploy.status === 'success' ? '✓' : '✗';
+        
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**${deploy.hostName}** - ${deploy.fileName}`),
+              new TextDisplayBuilder().setContent(`${statusEmoji} ${deploy.status === 'success' ? 'Sucesso' : 'Falhou'} - ${date.toLocaleString('pt-BR')}\nApp: \`${deploy.appId}\``)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId(`history_view_${deploy.id}`)
+                .setLabel('Detalhes')
+                .setStyle(ButtonStyle.Secondary)
+            )
+        );
+      });
+    }
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('history_refresh')
+        .setLabel('Atualizar')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('back_main')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.update({ 
+      components: [container, row]
+    });
+  } else if (action === 'history') {
+    if (params[0] === 'view') {
+      const deployId = params[1];
+      if (!deployHistoryManager) {
+        return interaction.reply({ content: 'Histórico não disponível', ephemeral: true });
+      }
+
+      const deploy = deployHistoryManager.getDeployById(deployId);
+      if (!deploy) {
+        return interaction.reply({ content: 'Deploy não encontrado', ephemeral: true });
+      }
+
+      const date = new Date(deploy.timestamp);
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`# Detalhes do Deploy`)
+        )
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**Host:** ${deploy.hostName}`),
+          new TextDisplayBuilder().setContent(`**App ID:** \`${deploy.appId}\``),
+          new TextDisplayBuilder().setContent(`**Arquivo:** ${deploy.fileName}`),
+          new TextDisplayBuilder().setContent(`**Status:** ${deploy.status === 'success' ? 'Sucesso ✓' : 'Falhou ✗'}`),
+          new TextDisplayBuilder().setContent(`**Data:** ${date.toLocaleString('pt-BR')}`),
+          new TextDisplayBuilder().setContent(`**Usuário:** <@${deploy.userId}>`)
+        )
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(false))
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**Mensagem:**\n${deploy.message}`)
+        );
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('open_history')
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.update({ 
+        components: [container, row]
+      });
+    } else if (params[0] === 'refresh') {
+      if (!deployHistoryManager) {
+        return interaction.update({ content: 'Histórico não disponível', ephemeral: true });
+      }
+
+      const history = deployHistoryManager.getHistory(undefined, undefined, 15);
+
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('# Histórico de Deploys'),
+          new TextDisplayBuilder().setContent('Últimos 15 deploys realizados')
+        )
+        .addSeparatorComponents(new SeparatorBuilder());
+
+      if (history.length === 0) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('Nenhum deploy registrado ainda')
+        );
+      } else {
+        history.forEach((deploy: any) => {
+          const date = new Date(deploy.timestamp);
+          const statusEmoji = deploy.status === 'success' ? '✓' : '✗';
+          
+          container.addSectionComponents(
+            new SectionBuilder()
+              .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`**${deploy.hostName}** - ${deploy.fileName}`),
+                new TextDisplayBuilder().setContent(`${statusEmoji} ${deploy.status === 'success' ? 'Sucesso' : 'Falhou'} - ${date.toLocaleString('pt-BR')}\nApp: \`${deploy.appId}\``)
+              )
+              .setButtonAccessory(
+                new ButtonBuilder()
+                  .setCustomId(`history_view_${deploy.id}`)
+                  .setLabel('Detalhes')
+                  .setStyle(ButtonStyle.Secondary)
+              )
+          );
+        });
+      }
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('history_refresh')
+          .setLabel('Atualizar')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('back_main')
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.update({ 
+        components: [container, row]
+      });
+    }
+  } else if (action === 'open' && params[0] === 'notifications') {
+    if (!notificationManager) {
+      return interaction.update({ content: 'Notificações não disponíveis', ephemeral: true });
+    }
+
+    const settings = notificationManager.getUserSettings(interaction.user.id);
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Configurações de Notificações'),
+        new TextDisplayBuilder().setContent('Escolha quais eventos você quer ser notificado')
+      )
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`**Método:** ${settings.method === 'dm' ? 'Mensagem Direta' : 'Canal'}`),
+        new TextDisplayBuilder().setContent(`**Deploy:** ${settings.events.deploy ? 'Ativado ✓' : 'Desativado ✗'}`),
+        new TextDisplayBuilder().setContent(`**Mudança de Status:** ${settings.events.statusChange ? 'Ativado ✓' : 'Desativado ✗'}`),
+        new TextDisplayBuilder().setContent(`**Crash:** ${settings.events.crash ? 'Ativado ✓' : 'Desativado ✗'}`),
+        new TextDisplayBuilder().setContent(`**Restart:** ${settings.events.restart ? 'Ativado ✓' : 'Desativado ✗'}`)
+      );
+
+    const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('notif_toggle_deploy')
+        .setLabel('Deploy')
+        .setStyle(settings.events.deploy ? ButtonStyle.Success : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('notif_toggle_statusChange')
+        .setLabel('Status')
+        .setStyle(settings.events.statusChange ? ButtonStyle.Success : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('notif_toggle_crash')
+        .setLabel('Crash')
+        .setStyle(settings.events.crash ? ButtonStyle.Success : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('notif_toggle_restart')
+        .setLabel('Restart')
+        .setStyle(settings.events.restart ? ButtonStyle.Success : ButtonStyle.Secondary)
+    );
+
+    const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('notif_method')
+        .setLabel(`Método: ${settings.method === 'dm' ? 'DM' : 'Canal'}`)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('back_main')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.update({ 
+      components: [container, row1, row2]
+    });
+  } else if (action === 'notif') {
+    if (params[0] === 'toggle') {
+      const eventType = params[1] as any;
+      if (!notificationManager) {
+        return interaction.reply({ content: 'Notificações não disponíveis', ephemeral: true });
+      }
+
+      const newState = notificationManager.toggleEvent(interaction.user.id, eventType);
+      await interaction.reply({ 
+        content: `Notificações de ${eventType} ${newState ? 'ativadas' : 'desativadas'}`,
+        ephemeral: true 
+      });
+    } else if (params[0] === 'method') {
+      if (!notificationManager) {
+        return interaction.reply({ content: 'Notificações não disponíveis', ephemeral: true });
+      }
+
+      const settings = notificationManager.getUserSettings(interaction.user.id);
+      const newMethod = settings.method === 'dm' ? 'channel' : 'dm';
+      notificationManager.setUserSettings(interaction.user.id, { method: newMethod });
+
+      await interaction.reply({ 
+        content: `Método alterado para ${newMethod === 'dm' ? 'Mensagem Direta' : 'Canal'}`,
+        ephemeral: true 
+      });
+    }
   } else if (action === 'logs') {
     const hostName = params[0];
     const appId = params[1];
@@ -942,7 +1183,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
   }
 }
 
-async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any) {
+async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any) {
   const [action, type, hostName] = interaction.customId.split('_');
 
   if (action === 'deploy' && type === 'modal') {
@@ -963,8 +1204,17 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       const result = await provider.deploy(buffer, 'bot.zip');
 
       if (result.success) {
+        if (deployHistoryManager) {
+          deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', fileUrl, 'success', result.message, interaction.user.id);
+        }
+        if (notificationManager) {
+          await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
+        }
         await interaction.editReply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}` });
       } else {
+        if (deployHistoryManager) {
+          deployHistoryManager.addDeploy(hostName, 'failed', fileUrl, 'failed', result.message, interaction.user.id);
+        }
         await interaction.editReply({ content: result.message });
       }
     } catch (error: any) {
