@@ -924,82 +924,21 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
   } else if (action === 'deploy') {
     const hostName = params[0];
     
-    await interaction.reply({ 
-      content: `**Deploy - ${hostName}**\n\nEnvie o arquivo .zip do seu bot como anexo nesta mensagem.\n\nOu responda com a URL do arquivo .zip hospedado.`,
-      ephemeral: true 
-    });
+    const modal = new ModalBuilder()
+      .setCustomId(`deploy_confirm_${hostName}`)
+      .setTitle(`Deploy - ${hostName}`);
 
-    const filter = (m: Message) => m.author.id === interaction.user.id;
-    const collector = interaction.channel?.createMessageCollector({ filter, time: 120000, max: 1 });
+    const confirmInput = new TextInputBuilder()
+      .setCustomId('confirm')
+      .setLabel('Digite "confirmar" para prosseguir')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('confirmar')
+      .setRequired(true);
 
-    collector?.on('collect', async (message: Message) => {
-      const attachment = message.attachments.first();
-      const content = message.content.trim();
+    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput);
+    modal.addComponents(row);
 
-      if (!attachment && !content) {
-        return message.reply({ content: 'Envie um arquivo .zip ou uma URL' });
-      }
-
-      await message.reply({ content: 'Processando...' });
-
-      try {
-        const axios = (await import('axios')).default;
-        let buffer: Buffer;
-        let fileName: string;
-
-        if (attachment) {
-          if (!attachment.name.endsWith('.zip')) {
-            return message.reply({ content: 'O arquivo deve ser .zip' });
-          }
-          const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
-          buffer = Buffer.from(response.data);
-          fileName = attachment.name;
-        } else {
-          const response = await axios.get(content, { responseType: 'arraybuffer' });
-          buffer = Buffer.from(response.data);
-          fileName = 'bot.zip';
-        }
-
-        if (hostName === 'squarecloud') {
-          const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
-          
-          if (needsSquareCloudConfig(buffer)) {
-            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
-            buffer = await ensureSquareCloudConfig(buffer);
-          }
-        }
-
-        const provider = hostManager.getProvider(hostName);
-        if (!provider) {
-          return message.reply({ content: 'Host não encontrada' });
-        }
-
-        const result = await provider.deploy(buffer, fileName);
-
-        if (result.success) {
-          if (deployHistoryManager) {
-            deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment?.url || content, 'success', result.message, interaction.user.id);
-          }
-          if (notificationManager) {
-            await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
-          }
-          await message.reply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}` });
-        } else {
-          if (deployHistoryManager) {
-            deployHistoryManager.addDeploy(hostName, 'failed', attachment?.url || content, 'failed', result.message, interaction.user.id);
-          }
-          await message.reply({ content: `Erro no deploy: ${result.message}` });
-        }
-      } catch (error: any) {
-        await message.reply({ content: `Erro: ${error.message}` });
-      }
-    });
-
-    collector?.on('end', (collected: Collection<string, Message>) => {
-      if (collected.size === 0) {
-        interaction.followUp({ content: 'Tempo esgotado. Use o botão Deploy novamente.', ephemeral: true });
-      }
-    });
+    await interaction.showModal(modal);
   } else if (['start', 'stop', 'restart'].includes(action)) {
     const hostName = params[0];
     const appId = params[1];
@@ -1447,7 +1386,81 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
   
   console.log('Modal recebido:', { customId: interaction.customId, action, type, hostName });
 
-  if (action === 'deploy' && type === 'modal') {
+  if (action === 'deploy' && type === 'confirm') {
+    const confirmText = interaction.fields.getTextInputValue('confirm').toLowerCase();
+    
+    if (confirmText !== 'confirmar') {
+      return interaction.reply({ content: 'Deploy cancelado', ephemeral: true });
+    }
+
+    await interaction.reply({ 
+      content: `**Deploy - ${hostName}**\n\nAgora envie o arquivo .zip do seu bot como anexo nesta mensagem.\n\nVocê tem 2 minutos.`,
+      ephemeral: true 
+    });
+
+    const filter = (m: Message) => m.author.id === interaction.user.id;
+    const collector = interaction.channel?.createMessageCollector({ filter, time: 120000, max: 1 });
+
+    collector?.on('collect', async (message: Message) => {
+      const attachment = message.attachments.first();
+
+      if (!attachment) {
+        return message.reply({ content: 'Você precisa enviar um arquivo .zip anexado' });
+      }
+
+      if (!attachment.name.endsWith('.zip')) {
+        return message.reply({ content: 'O arquivo deve ser .zip' });
+      }
+
+      await message.reply({ content: 'Processando deploy...' });
+
+      try {
+        const axios = (await import('axios')).default;
+        const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+        let buffer = Buffer.from(response.data);
+        const fileName = attachment.name;
+
+        if (hostName === 'squarecloud') {
+          const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
+          
+          if (needsSquareCloudConfig(buffer)) {
+            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
+            buffer = await ensureSquareCloudConfig(buffer);
+          }
+        }
+
+        const provider = hostManager.getProvider(hostName);
+        if (!provider) {
+          return message.reply({ content: 'Host não encontrada' });
+        }
+
+        const result = await provider.deploy(buffer, fileName);
+
+        if (result.success) {
+          if (deployHistoryManager) {
+            deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment.url, 'success', result.message, interaction.user.id);
+          }
+          if (notificationManager) {
+            await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
+          }
+          await message.reply({ content: `Deploy realizado com sucesso!\nApp ID: \`${result.appId}\`\n${result.message}` });
+        } else {
+          if (deployHistoryManager) {
+            deployHistoryManager.addDeploy(hostName, 'failed', attachment.url, 'failed', result.message, interaction.user.id);
+          }
+          await message.reply({ content: `Erro no deploy: ${result.message}` });
+        }
+      } catch (error: any) {
+        await message.reply({ content: `Erro ao processar: ${error.message}` });
+      }
+    });
+
+    collector?.on('end', (collected: Collection<string, Message>) => {
+      if (collected.size === 0) {
+        interaction.followUp({ content: 'Tempo esgotado. Use o botão Deploy novamente.', ephemeral: true });
+      }
+    });
+  } else if (action === 'deploy' && type === 'modal') {
     const fileUrl = interaction.fields.getTextInputValue('file_url');
     
     console.log('Deploy iniciado para:', hostName, 'URL:', fileUrl);
