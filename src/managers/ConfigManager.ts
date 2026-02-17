@@ -6,6 +6,15 @@ interface Config {
     [key: string]: {
       apiToken: string;
       enabled: boolean;
+      displayName?: string;
+      documentation?: string;
+    };
+  };
+  availableHosts: {
+    [key: string]: {
+      displayName: string;
+      documentation: string;
+      providerClass: string;
     };
   };
 }
@@ -24,7 +33,21 @@ export class ConfigManager {
       const data = fs.readFileSync(this.configPath, 'utf-8');
       return JSON.parse(data);
     }
-    return { hosts: {} };
+    return { 
+      hosts: {},
+      availableHosts: {
+        discloud: {
+          displayName: 'Discloud',
+          documentation: 'https://docs.discloud.com',
+          providerClass: 'DiscloudProvider'
+        },
+        squarecloud: {
+          displayName: 'SquareCloud',
+          documentation: 'https://docs.squarecloud.app',
+          providerClass: 'SquareCloudProvider'
+        }
+      }
+    };
   }
 
   private saveConfig(): void {
@@ -54,13 +77,33 @@ export class ConfigManager {
     return this.config.hosts[hostName]?.enabled ?? false;
   }
 
-  getAllHosts(): { name: string; enabled: boolean; configured: boolean }[] {
-    const availableHosts = ['discloud', 'squarecloud'];
-    return availableHosts.map(host => ({
-      name: host,
-      enabled: this.config.hosts[host]?.enabled ?? false,
-      configured: !!this.config.hosts[host]?.apiToken
+  getAllHosts(): { name: string; enabled: boolean; configured: boolean; displayName: string; documentation: string }[] {
+    return Object.entries(this.config.availableHosts).map(([key, hostInfo]) => ({
+      name: key,
+      enabled: this.config.hosts[key]?.enabled ?? false,
+      configured: !!this.config.hosts[key]?.apiToken,
+      displayName: hostInfo.displayName,
+      documentation: hostInfo.documentation
     }));
+  }
+
+  addAvailableHost(name: string, displayName: string, documentation: string, providerClass: string): void {
+    this.config.availableHosts[name] = {
+      displayName,
+      documentation,
+      providerClass
+    };
+    this.saveConfig();
+  }
+
+  removeAvailableHost(name: string): void {
+    delete this.config.availableHosts[name];
+    delete this.config.hosts[name];
+    this.saveConfig();
+  }
+
+  getHostInfo(name: string) {
+    return this.config.availableHosts[name];
   }
 
   removeHost(hostName: string): void {

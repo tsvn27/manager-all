@@ -74,13 +74,18 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager) {
         .setLabel('Deploy')
         .setStyle(ButtonStyle.Success);
 
+      const configButton = new ButtonBuilder()
+        .setCustomId('open_config')
+        .setLabel('Configurações')
+        .setStyle(ButtonStyle.Secondary);
+
       const backButton = new ButtonBuilder()
         .setCustomId('back_main')
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, backButton);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
 
       await interaction.editReply({ 
         components: [container, row1, row2],
@@ -177,7 +182,52 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager) {
 async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager) {
   const [action, ...params] = interaction.customId.split('_');
 
-  if (action === 'config') {
+  if (action === 'open' && params[0] === 'config') {
+    const hosts = configManager.getAllHosts();
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Configuração de Hosts'),
+        new TextDisplayBuilder().setContent('Configure as API keys das hosts para usar o manager')
+      )
+      .addSeparatorComponents(new SeparatorBuilder());
+
+    hosts.forEach(host => {
+      const status = host.configured 
+        ? (host.enabled ? 'Configurada e Ativa' : 'Configurada e Desativada')
+        : 'Não Configurada';
+      
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${host.name.charAt(0).toUpperCase() + host.name.slice(1)}**`),
+            new TextDisplayBuilder().setContent(`Status: ${status}`)
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`config_host_${host.name}`)
+              .setLabel('Configurar')
+              .setStyle(ButtonStyle.Primary)
+          )
+      );
+    });
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('config_refresh')
+        .setLabel('Atualizar')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('back_main')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.update({ 
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
+    });
+  } else if (action === 'config') {
     if (params[0] === 'host') {
       const hostName = params[1];
       
@@ -214,7 +264,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         container.addSectionComponents(
           new SectionBuilder()
             .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`**${host.name.charAt(0).toUpperCase() + host.name.slice(1)}**`),
+              new TextDisplayBuilder().setContent(`**${host.displayName}**`),
               new TextDisplayBuilder().setContent(`Status: ${status}`)
             )
             .setButtonAccessory(
@@ -230,6 +280,14 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         new ButtonBuilder()
           .setCustomId('config_refresh')
           .setLabel('Atualizar')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('config_add_host')
+          .setLabel('Adicionar Host')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('back_main')
+          .setLabel('Voltar')
           .setStyle(ButtonStyle.Secondary)
       );
 
@@ -237,6 +295,47 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         components: [container, row],
         flags: MessageFlags.IsComponentsV2
       });
+    } else if (params[0] === 'add' && params[1] === 'host') {
+      const modal = new ModalBuilder()
+        .setCustomId('add_host_modal')
+        .setTitle('Adicionar Nova Host');
+
+      const nameInput = new TextInputBuilder()
+        .setCustomId('host_name')
+        .setLabel('Nome da Host (ex: discloud)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('discloud')
+        .setRequired(true);
+
+      const displayNameInput = new TextInputBuilder()
+        .setCustomId('display_name')
+        .setLabel('Nome de Exibição (ex: Discloud)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Discloud')
+        .setRequired(true);
+
+      const docInput = new TextInputBuilder()
+        .setCustomId('documentation')
+        .setLabel('Link da Documentação')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('https://docs.discloud.com')
+        .setRequired(true);
+
+      const providerInput = new TextInputBuilder()
+        .setCustomId('provider_class')
+        .setLabel('Classe do Provider (ex: DiscloudProvider)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('DiscloudProvider')
+        .setRequired(true);
+
+      const row1 = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+      const row2 = new ActionRowBuilder<TextInputBuilder>().addComponents(displayNameInput);
+      const row3 = new ActionRowBuilder<TextInputBuilder>().addComponents(docInput);
+      const row4 = new ActionRowBuilder<TextInputBuilder>().addComponents(providerInput);
+      
+      modal.addComponents(row1, row2, row3, row4);
+
+      await interaction.showModal(modal);
     }
   } else if (action === 'back') {
     if (params[0] === 'main') {
@@ -265,10 +364,16 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
           }))
         );
 
-      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+      const configButton = new ButtonBuilder()
+        .setCustomId('open_config')
+        .setLabel('Configurações')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton);
 
       await interaction.update({ 
-        components: [container, row],
+        components: [container, row1, row2],
         flags: MessageFlags.IsComponentsV2
       });
     } else if (params[0] === 'host') {
@@ -329,13 +434,18 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setLabel('Deploy')
         .setStyle(ButtonStyle.Success);
 
+      const configButton = new ButtonBuilder()
+        .setCustomId('open_config')
+        .setLabel('Configurações')
+        .setStyle(ButtonStyle.Secondary);
+
       const backButton = new ButtonBuilder()
         .setCustomId('back_main')
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, backButton);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
 
       await interaction.editReply({ 
         components: [container, row1, row2],
@@ -525,6 +635,25 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     } catch (error: any) {
       await interaction.reply({ 
         content: `Erro ao configurar: ${error.message}`,
+        ephemeral: true 
+      });
+    }
+  } else if (action === 'add' && type === 'host' && hostName === 'modal') {
+    const hostNameInput = interaction.fields.getTextInputValue('host_name').toLowerCase();
+    const displayName = interaction.fields.getTextInputValue('display_name');
+    const documentation = interaction.fields.getTextInputValue('documentation');
+    const providerClass = interaction.fields.getTextInputValue('provider_class');
+
+    try {
+      configManager.addAvailableHost(hostNameInput, displayName, documentation, providerClass);
+
+      await interaction.reply({ 
+        content: `Host ${displayName} adicionada com sucesso\nDocumentação: ${documentation}`,
+        ephemeral: true 
+      });
+    } catch (error: any) {
+      await interaction.reply({ 
+        content: `Erro ao adicionar host: ${error.message}`,
         ephemeral: true 
       });
     }

@@ -23,7 +23,7 @@ export async function execute(interaction: ChatInputCommandInteraction, configMa
     container.addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`**${host.name.charAt(0).toUpperCase() + host.name.slice(1)}**`),
+          new TextDisplayBuilder().setContent(`**${host.displayName}**`),
           new TextDisplayBuilder().setContent(`Status: ${status}`)
         )
         .setButtonAccessory(
@@ -39,7 +39,11 @@ export async function execute(interaction: ChatInputCommandInteraction, configMa
     new ButtonBuilder()
       .setCustomId('config_refresh')
       .setLabel('Atualizar')
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('config_add_host')
+      .setLabel('Adicionar Host')
+      .setStyle(ButtonStyle.Success)
   );
 
   await interaction.reply({ 

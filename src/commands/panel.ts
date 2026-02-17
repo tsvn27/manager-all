@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 
 export const data = new SlashCommandBuilder()
@@ -9,7 +9,27 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
   const providers = hostManager.getAllProviders();
   
   if (providers.length === 0) {
-    return interaction.reply({ content: 'Nenhuma host configurada', ephemeral: true });
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('# Painel de Gerenciamento'),
+        new TextDisplayBuilder().setContent('Nenhuma host configurada ainda')
+      )
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('Use o botão abaixo para configurar suas hosts')
+      );
+
+    const configButton = new ButtonBuilder()
+      .setCustomId('open_config')
+      .setLabel('Configurar Hosts')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton);
+
+    return interaction.reply({ 
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2
+    });
   }
 
   const container = new ContainerBuilder()
@@ -35,10 +55,16 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
       }))
     );
 
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+  const configButton = new ButtonBuilder()
+    .setCustomId('open_config')
+    .setLabel('Configurações')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton);
 
   await interaction.reply({ 
-    components: [container, row],
+    components: [container, row1, row2],
     flags: MessageFlags.IsComponentsV2
   });
 }
