@@ -331,11 +331,16 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
           .setStyle(ButtonStyle.Secondary)
       );
 
-      const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(0, 3));
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(3));
+      const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(0, Math.min(5, buttons.length)));
+      const rows = [container, row1];
+      
+      if (buttons.length > 5) {
+        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(5));
+        rows.push(row2);
+      }
 
       await interaction.update({ 
-        components: [container, row1, row2]
+        components: rows
       });
     } else if (params[0] === 'setup' || params[0] === 'edit') {
       const hostName = params[1];
