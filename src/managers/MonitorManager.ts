@@ -7,6 +7,8 @@ interface MonitoredApp {
   appId: string;
   lastStatus: string;
   channelId: string;
+  autoRestart: boolean;
+  restartCount: number;
 }
 
 export class MonitorManager {
@@ -30,7 +32,7 @@ export class MonitorManager {
     });
   }
 
-  startMonitoring(hostName: string, appId: string, channelId: string) {
+  startMonitoring(hostName: string, appId: string, channelId: string, autoRestart: boolean = false) {
     const key = `${hostName}_${appId}`;
     
     if (this.intervals.has(key)) {
@@ -41,7 +43,9 @@ export class MonitorManager {
       hostName,
       appId,
       lastStatus: 'unknown',
-      channelId
+      channelId,
+      autoRestart,
+      restartCount: 0
     });
 
     const interval = setInterval(async () => {
@@ -77,14 +81,34 @@ export class MonitorManager {
       const status = await provider.getStatus(appId);
       const currentStatus = status.status;
 
-      if (monitor.lastStatus !== 'unknown' && monitor.lastStatus !== currentStatus) {
+      // Auto-restart se o app caiu
+      if (monitor.autoRestart && monitor.lastStatus === 'online' && currentStatus === 'offline') {
+        try {
+          await provider.start(appId);
+          monitor.restartCount++;
+          
+          await this.sendNotification(channelId, {
+            appName: status.name,
+            hostName: provider.name,
+            oldStatus: monitor.lastStatus,
+            newStatus: 'restarting',
+            cpu: status.cpu,
+            ram: status.ram,
+            autoRestart: true,
+            restartCount: monitor.restartCount
+          });
+        } catch (error) {
+          console.error(`Erro ao reiniciar ${hostName}/${appId}:`, error);
+        }
+      } else if (monitor.lastStatus !== 'unknown' && monitor.lastStatus !== currentStatus) {
         await this.sendNotification(channelId, {
           appName: status.name,
           hostName: provider.name,
           oldStatus: monitor.lastStatus,
           newStatus: currentStatus,
           cpu: status.cpu,
-          ram: status.ram
+          ram: status.ram,
+          autoRestart: false
         });
       }
 
@@ -99,17 +123,40 @@ export class MonitorManager {
       const channel = await this.client.channels.fetch(channelId) as TextChannel;
       if (!channel) return;
 
-      const statusEmoji = data.newStatus === 'online' ? '🟢' : '🔴';
-      const color = data.newStatus === 'online' ? 0x00ff00 : 0xff0000;
+      let statusEmoji = data.newStatus === 'online' ? '🟢' : '🔴';
+      let message = '';
 
-      const message = `${statusEmoji} **${data.appName}** mudou de status\n` +
-                     `Host: ${data.hostName}\n` +
-                     `${data.oldStatus.toUpperCase()} → ${data.newStatus.toUpperCase()}`;
+      if (data.autoRestart) {
+        statusEmoji = '🔄';
+        message = `${statusEmoji} **${data.appName}** caiu e foi reiniciado automaticamente\n` +
+                 `Host: ${data.hostName}\n` +
+                 `Reinicializações: ${data.restartCount}`;
+      } else {
+        message = `${statusEmoji} **${data.appName}** mudou de status\n` +
+                 `Host: ${data.hostName}\n` +
+                 `${data.oldStatus.toUpperCase()} → ${data.newStatus.toUpperCase()}`;
+      }
 
       await channel.send({ content: message });
     } catch (error) {
       console.error('Erro ao enviar notificação:', error);
     }
+  }
+
+  toggleAutoRestart(hostName: string, appId: string): boolean {
+    const key = `${hostName}_${appId}`;
+    const monitor = this.monitors.get(key);
+    if (!monitor) return false;
+
+    monitor.autoRestart = !monitor.autoRestart;
+    monitor.restartCount = 0;
+    return monitor.autoRestart;
+  }
+
+  getAutoRestartStatus(hostName: string, appId: string): boolean {
+    const key = `${hostName}_${appId}`;
+    const monitor = this.monitors.get(key);
+    return monitor?.autoRestart || false;
   }
 
   getMonitoredApps(): MonitoredApp[] {

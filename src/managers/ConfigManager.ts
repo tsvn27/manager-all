@@ -22,6 +22,11 @@ interface Config {
     appId: string;
     channelId: string;
   }>;
+  settings?: {
+    autoBackupBeforeDeploy?: boolean;
+    maxBackups?: number;
+    backupRetentionDays?: number;
+  };
 }
 
 export class ConfigManager {
@@ -134,5 +139,48 @@ export class ConfigManager {
 
   getMonitors(): Array<{ hostName: string; appId: string; channelId: string }> {
     return this.config.monitors || [];
+  }
+}
+
+  getSetting(key: 'autoBackupBeforeDeploy' | 'maxBackups' | 'backupRetentionDays'): any {
+    if (!this.config.settings) {
+      this.config.settings = {
+        autoBackupBeforeDeploy: false,
+        maxBackups: 10,
+        backupRetentionDays: 30
+      };
+      this.saveConfig();
+    }
+    return this.config.settings[key];
+  }
+
+  setSetting(key: 'autoBackupBeforeDeploy' | 'maxBackups' | 'backupRetentionDays', value: any): void {
+    if (!this.config.settings) {
+      this.config.settings = {
+        autoBackupBeforeDeploy: false,
+        maxBackups: 10,
+        backupRetentionDays: 30
+      };
+    }
+    this.config.settings[key] = value;
+    this.saveConfig();
+  }
+
+  toggleAutoBackup(): boolean {
+    const current = this.getSetting('autoBackupBeforeDeploy');
+    this.setSetting('autoBackupBeforeDeploy', !current);
+    return !current;
+  }
+
+  getAllSettings() {
+    if (!this.config.settings) {
+      this.config.settings = {
+        autoBackupBeforeDeploy: false,
+        maxBackups: 10,
+        backupRetentionDays: 30
+      };
+      this.saveConfig();
+    }
+    return this.config.settings;
   }
 }

@@ -212,6 +212,11 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Logs')
         .setStyle(ButtonStyle.Secondary);
 
+      const autoRestartBtn = new ButtonBuilder()
+        .setCustomId(`autorestart_toggle_${hostName}_${appId}`)
+        .setLabel('Auto-Restart')
+        .setStyle(ButtonStyle.Primary);
+
       const deleteBtn = new ButtonBuilder()
         .setCustomId(`delete_app_${hostName}_${appId}`)
         .setLabel('Deletar')
@@ -223,11 +228,12 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, deleteBtn, backBtn);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, autoRestartBtn);
+      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
 
       await interaction.editReply({ 
         content: '',
-        components: [container, row1, row2],
+        components: [container, row1, row2, row3],
         flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
@@ -293,6 +299,10 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setLabel('Atualizar')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
+        .setCustomId('config_global_settings')
+        .setLabel('Configurações Globais')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
         .setCustomId('config_add_host')
         .setLabel('Adicionar Host')
         .setStyle(ButtonStyle.Success),
@@ -308,7 +318,67 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
       flags: MessageFlags.IsComponentsV2
     });
   } else if (action === 'config') {
-    if (params[0] === 'manage') {
+    if (params[0] === 'global' && params[1] === 'settings') {
+      const settings = configManager.getAllSettings();
+
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('# Configurações Globais')
+        )
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent('**Backup Automático**'),
+              new TextDisplayBuilder().setContent(`Status: ${settings.autoBackupBeforeDeploy ? 'Ativado' : 'Desativado'}`)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId('config_toggle_autobackup')
+                .setLabel(settings.autoBackupBeforeDeploy ? 'Desativar' : 'Ativar')
+                .setStyle(settings.autoBackupBeforeDeploy ? ButtonStyle.Danger : ButtonStyle.Success)
+            )
+        )
+        .addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent('**Máximo de Backups**'),
+              new TextDisplayBuilder().setContent(`Valor: ${settings.maxBackups}`)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId('config_edit_maxbackups')
+                .setLabel('Editar')
+                .setStyle(ButtonStyle.Primary)
+            )
+        )
+        .addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent('**Retenção de Backups (dias)**'),
+              new TextDisplayBuilder().setContent(`Valor: ${settings.backupRetentionDays}`)
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId('config_edit_retention')
+                .setLabel('Editar')
+                .setStyle(ButtonStyle.Primary)
+            )
+        );
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('open_config')
+          .setLabel('Voltar')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.update({ 
+        content: '',
+        components: [container, row],
+        flags: MessageFlags.IsComponentsV2
+      });
+    } else if (params[0] === 'manage') {
       const hostName = params[1];
       const hostInfo = configManager.getHostInfo(hostName);
       const isConfigured = !!configManager.getHostToken(hostName);
@@ -389,6 +459,45 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setRequired(true);
 
       const row = new ActionRowBuilder<TextInputBuilder>().addComponents(tokenInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
+    } else if (params[0] === 'toggle' && params[1] === 'autobackup') {
+      const newState = configManager.toggleAutoBackup();
+      
+      await interaction.reply({ 
+        content: `Backup automático ${newState ? 'ativado' : 'desativado'}`,
+        ephemeral: true 
+      });
+    } else if (params[0] === 'edit' && params[1] === 'maxbackups') {
+      const modal = new ModalBuilder()
+        .setCustomId('config_maxbackups_modal')
+        .setTitle('Editar Máximo de Backups');
+
+      const valueInput = new TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('Número máximo de backups')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('10')
+        .setRequired(true);
+
+      const row = new ActionRowBuilder<TextInputBuilder>().addComponents(valueInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
+    } else if (params[0] === 'edit' && params[1] === 'retention') {
+      const modal = new ModalBuilder()
+        .setCustomId('config_retention_modal')
+        .setTitle('Editar Retenção de Backups');
+
+      const valueInput = new TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('Dias de retenção')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('30')
+        .setRequired(true);
+
+      const row = new ActionRowBuilder<TextInputBuilder>().addComponents(valueInput);
       modal.addComponents(row);
 
       await interaction.showModal(modal);
@@ -1326,9 +1435,42 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     modal.addComponents(row);
 
     await interaction.showModal(modal);
+  } else if (action === 'autorestart' && params[0] === 'toggle') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    if (!monitorManager) {
+      return interaction.reply({ content: 'Sistema de monitoramento não disponível', ephemeral: true });
+    }
+
+    if (!monitorManager.isMonitoring(hostName, appId)) {
+      const modal = new ModalBuilder()
+        .setCustomId(`autorestart_setup_${hostName}_${appId}`)
+        .setTitle('Configurar Auto-Restart');
+
+      const channelInput = new TextInputBuilder()
+        .setCustomId('channel_id')
+        .setLabel('ID do Canal para Notificações')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('123456789')
+        .setRequired(true);
+
+      const row = new ActionRowBuilder<TextInputBuilder>().addComponents(channelInput);
+      modal.addComponents(row);
+
+      return interaction.showModal(modal);
+    }
+
+    const newState = monitorManager.toggleAutoRestart(hostName, appId);
+    
+    await interaction.reply({ 
+      content: `Auto-restart ${newState ? 'ativado' : 'desativado'} para este app`,
+      ephemeral: true 
+    });
   } else if (action === 'logs') {
     const hostName = params[0];
     const appId = params[1];
+    const filter = params[2]; 
 
     const provider = hostManager.getProvider(hostName);
     if (!provider) {
@@ -1338,13 +1480,83 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const logs = await provider.getLogs(appId);
-      const truncated = logs.length > 1900 ? logs.slice(-1900) + '\n...' : logs;
+      let logs = await provider.getLogs(appId);
       
-      await interaction.editReply({ content: `**Logs**\n\`\`\`\n${truncated}\n\`\`\`` });
+      if (filter && filter !== 'all') {
+        const lines = logs.split('\n');
+        const filtered = lines.filter(line => {
+          const lowerLine = line.toLowerCase();
+          if (filter === 'error') return lowerLine.includes('error') || lowerLine.includes('err');
+          if (filter === 'warn') return lowerLine.includes('warn') || lowerLine.includes('warning');
+          if (filter === 'info') return lowerLine.includes('info');
+          return true;
+        });
+        logs = filtered.join('\n');
+      }
+      
+      const truncated = logs.length > 1900 ? '...\n' + logs.slice(-1900) : logs;
+      
+      const filterLabel = filter ? ` (${filter.toUpperCase()})` : '';
+      
+      const allBtn = new ButtonBuilder()
+        .setCustomId(`logs_${hostName}_${appId}_all`)
+        .setLabel('Todos')
+        .setStyle(filter === 'all' || !filter ? ButtonStyle.Primary : ButtonStyle.Secondary);
+
+      const errorBtn = new ButtonBuilder()
+        .setCustomId(`logs_${hostName}_${appId}_error`)
+        .setLabel('Erros')
+        .setStyle(filter === 'error' ? ButtonStyle.Danger : ButtonStyle.Secondary);
+
+      const warnBtn = new ButtonBuilder()
+        .setCustomId(`logs_${hostName}_${appId}_warn`)
+        .setLabel('Avisos')
+        .setStyle(filter === 'warn' ? ButtonStyle.Primary : ButtonStyle.Secondary);
+
+      const infoBtn = new ButtonBuilder()
+        .setCustomId(`logs_${hostName}_${appId}_info`)
+        .setLabel('Info')
+        .setStyle(filter === 'info' ? ButtonStyle.Success : ButtonStyle.Secondary);
+
+      const searchBtn = new ButtonBuilder()
+        .setCustomId(`logs_search_${hostName}_${appId}`)
+        .setLabel('Buscar')
+        .setStyle(ButtonStyle.Success);
+
+      const backBtn = new ButtonBuilder()
+        .setCustomId(`select_app_${hostName}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(allBtn, errorBtn, warnBtn, infoBtn);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(searchBtn, backBtn);
+      
+      await interaction.editReply({ 
+        content: `**Logs${filterLabel}**\n\`\`\`\n${truncated}\n\`\`\``,
+        components: [row1, row2]
+      });
     } catch (error: any) {
       await interaction.editReply({ content: `Erro: ${error.message}` });
     }
+  } else if (action === 'logs' && params[0] === 'search') {
+    const hostName = params[1];
+    const appId = params[2];
+
+    const modal = new ModalBuilder()
+      .setCustomId(`logs_search_modal_${hostName}_${appId}`)
+      .setTitle('Buscar nos Logs');
+
+    const searchInput = new TextInputBuilder()
+      .setCustomId('search_term')
+      .setLabel('Termo de busca')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Digite o texto para buscar')
+      .setRequired(true);
+
+    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(searchInput);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
   }
 }
 
@@ -1353,7 +1565,84 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
   
   console.log('Modal recebido:', { customId: interaction.customId, action, type, hostName });
 
-  if (action === 'config' && type === 'modal') {
+  if (action === 'logs' && type === 'search' && hostName === 'modal') {
+    const parts = interaction.customId.split('_');
+    const hostNameValue = parts[3];
+    const appId = parts[4];
+    const searchTerm = interaction.fields.getTextInputValue('search_term');
+
+    const provider = hostManager.getProvider(hostNameValue);
+    if (!provider) {
+      return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const logs = await provider.getLogs(appId);
+      const lines = logs.split('\n');
+      const filtered = lines.filter(line => line.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      if (filtered.length === 0) {
+        return interaction.editReply({ content: `Nenhum resultado encontrado para "${searchTerm}"` });
+      }
+
+      const result = filtered.join('\n');
+      const truncated = result.length > 1900 ? '...\n' + result.slice(-1900) : result;
+      
+      await interaction.editReply({ 
+        content: `**Logs - Busca: "${searchTerm}"** (${filtered.length} linhas)\n\`\`\`\n${truncated}\n\`\`\`` 
+      });
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro: ${error.message}` });
+    }
+  } else if (action === 'autorestart' && type === 'setup') {
+    const hostNameValue = params[2];
+    const appId = params[3];
+    const channelId = interaction.fields.getTextInputValue('channel_id');
+
+    if (!monitorManager) {
+      return interaction.reply({ content: 'Sistema de monitoramento não disponível', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      monitorManager.startMonitoring(hostNameValue, appId, channelId, true);
+      
+      await interaction.editReply({ 
+        content: `Monitoramento e auto-restart ativados\n\n**Host:** ${hostNameValue}\n**App ID:** \`${appId}\`\n**Canal:** <#${channelId}>\n\nO app será reiniciado automaticamente se cair.` 
+      });
+    } catch (error: any) {
+      await interaction.editReply({ content: `Erro: ${error.message}` });
+    }
+  } else if (action === 'config' && type === 'maxbackups' && hostName === 'modal') {
+    const value = parseInt(interaction.fields.getTextInputValue('value'));
+    
+    if (isNaN(value) || value < 1) {
+      return interaction.reply({ content: 'Valor inválido. Digite um número maior que 0.', ephemeral: true });
+    }
+
+    configManager.setSetting('maxBackups', value);
+    
+    await interaction.reply({ 
+      content: `Máximo de backups atualizado para ${value}`,
+      ephemeral: true 
+    });
+  } else if (action === 'config' && type === 'retention' && hostName === 'modal') {
+    const value = parseInt(interaction.fields.getTextInputValue('value'));
+    
+    if (isNaN(value) || value < 1) {
+      return interaction.reply({ content: 'Valor inválido. Digite um número maior que 0.', ephemeral: true });
+    }
+
+    configManager.setSetting('backupRetentionDays', value);
+    
+    await interaction.reply({ 
+      content: `Retenção de backups atualizada para ${value} dias`,
+      ephemeral: true 
+    });
+  } else if (action === 'config' && type === 'modal') {
     const apiToken = interaction.fields.getTextInputValue('api_token');
 
     try {
