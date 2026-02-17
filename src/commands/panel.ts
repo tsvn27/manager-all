@@ -24,7 +24,12 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
       .setLabel('Configurar Hosts')
       .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton);
+    const monitorButton = new ButtonBuilder()
+      .setCustomId('open_monitor')
+      .setLabel('Monitoramento')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, monitorButton);
 
     return interaction.reply({ 
       components: [container, row],
