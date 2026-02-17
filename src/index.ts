@@ -10,6 +10,7 @@ import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
+import * as deploy from './commands/deploy.js';
 
 config();
 
@@ -22,7 +23,7 @@ const configManager = new ConfigManager();
 const deployHistoryManager = new DeployHistoryManager();
 const commands = new Collection();
 
-[panel].forEach(cmd => {
+[panel, deploy].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -77,7 +78,11 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     try {
-      await command.execute(interaction, hostManager);
+      if (interaction.commandName === 'deploy') {
+        await command.execute(interaction, hostManager, deployHistoryManager, notificationManager);
+      } else {
+        await command.execute(interaction, hostManager);
+      }
     } catch (error) {
       console.error(error);
       const reply = { content: 'Erro ao executar comando', ephemeral: true };

@@ -1,5 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
+import { DeployHistoryManager } from '../managers/DeployHistoryManager.js';
+import { NotificationManager } from '../managers/NotificationManager.js';
 import axios from 'axios';
 
 export const data = new SlashCommandBuilder()
@@ -18,7 +20,12 @@ export const data = new SlashCommandBuilder()
       .setDescription('Arquivo .zip do bot')
       .setRequired(true));
 
-export async function execute(interaction: ChatInputCommandInteraction, hostManager: HostManager) {
+export async function execute(
+  interaction: ChatInputCommandInteraction, 
+  hostManager: HostManager,
+  deployHistoryManager?: DeployHistoryManager,
+  notificationManager?: NotificationManager
+) {
   await interaction.deferReply();
 
   const hostName = interaction.options.getString('host', true);
@@ -35,13 +42,31 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
 
   try {
     const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
-    const buffer = Buffer.from(response.data);
+    let buffer = Buffer.from(response.data);
+
+    if (hostName === 'squarecloud') {
+      const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
+      
+      if (needsSquareCloudConfig(buffer)) {
+        await interaction.editReply('Arquivo de configuração SquareCloud não encontrado. Criando automaticamente...');
+        buffer = await ensureSquareCloudConfig(buffer);
+      }
+    }
 
     const result = await provider.deploy(buffer, attachment.name);
 
     if (result.success) {
-      return interaction.editReply(`Deploy realizado na ${provider.name}\nApp ID: \`${result.appId}\`\n${result.message}`);
+      if (deployHistoryManager) {
+        deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment.url, 'success', result.message, interaction.user.id);
+      }
+      if (notificationManager) {
+        await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
+      }
+      return interaction.editReply(`Deploy realizado com sucesso na ${provider.name}\nApp ID: \`${result.appId}\`\n${result.message}`);
     } else {
+      if (deployHistoryManager) {
+        deployHistoryManager.addDeploy(hostName, 'failed', attachment.url, 'failed', result.message, interaction.user.id);
+      }
       return interaction.editReply(`Erro no deploy: ${result.message}`);
     }
   } catch (error: any) {

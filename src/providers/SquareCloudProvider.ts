@@ -114,8 +114,8 @@ export class SquareCloudProvider implements HostProvider {
       
       return apps.map((app: any) => ({
         id: app.id,
-        name: app.tag,
-        status: app.isOnline ? 'online' : 'offline'
+        name: app.name || app.tag || 'App',
+        status: 'unknown'
       }));
     } catch (error: any) {
       throw new Error(`Erro ao buscar apps: ${error.response?.data?.message || error.message}`);

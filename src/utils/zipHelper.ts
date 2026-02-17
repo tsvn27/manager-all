@@ -9,9 +9,35 @@ export interface SquareCloudConfig {
 
 export async function ensureSquareCloudConfig(buffer: Buffer, config?: SquareCloudConfig): Promise<Buffer> {
   const zip = new AdmZip(buffer);
-  const entries = zip.getEntries();
+  let entries = zip.getEntries();
   
   console.log('Verificando arquivos no .zip:', entries.map(e => e.entryName));
+  
+  const rootFolder = entries.find(e => e.isDirectory && e.entryName.match(/^[^/]+\/$/));
+  
+  if (rootFolder) {
+    console.log('Pasta raiz detectada:', rootFolder.entryName);
+    const newZip = new AdmZip();
+    const prefix = rootFolder.entryName;
+    
+    entries.forEach(entry => {
+      if (entry.entryName === prefix) return;
+      if (entry.entryName.startsWith(prefix)) {
+        const newPath = entry.entryName.replace(prefix, '');
+        if (newPath) {
+          if (entry.isDirectory) {
+            newZip.addFile(newPath, Buffer.alloc(0));
+          } else {
+            newZip.addFile(newPath, entry.getData());
+          }
+        }
+      }
+    });
+    
+    buffer = newZip.toBuffer();
+    entries = newZip.getEntries();
+    console.log('Arquivos após remover pasta raiz:', entries.map(e => e.entryName));
+  }
   
   const hasConfig = entries.some(entry => 
     entry.entryName === 'squarecloud.app' || 
@@ -39,9 +65,10 @@ DISPLAY_NAME=${defaultConfig.displayName}`;
 
   console.log('Conteúdo do arquivo:', configContent);
 
-  zip.addFile('squarecloud.app', Buffer.from(configContent, 'utf-8'));
+  const finalZip = new AdmZip(buffer);
+  finalZip.addFile('squarecloud.app', Buffer.from(configContent, 'utf-8'));
   
-  const newBuffer = zip.toBuffer();
+  const newBuffer = finalZip.toBuffer();
   console.log('Novo .zip criado com tamanho:', newBuffer.length);
   
   return newBuffer;

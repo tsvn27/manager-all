@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1771300607287-ov5hv2yfa",
+    "hostName": "squarecloud",
+    "appId": "b2dbb369ee5c461cbd44cd0e1dbddfb8",
+    "timestamp": 1771300607287,
+    "fileName": "https://cdn.discordapp.com/ephemeral-attachments/1473166192155037890/1473166270537924649/botping.zip?ex=69953881&is=6993e701&hm=047b0516eb194959609ec8fb2464c6cb34ff37af7a0c1a82843d95421849e3f5&",
+    "status": "success",
+    "message": "Deploy realizado",
+    "userId": "160878475333468161"
+  },
+  {
+    "id": "1771300503449-m3snrwjgf",
+    "hostName": "squarecloud",
+    "appId": "failed",
+    "timestamp": 1771300503449,
+    "fileName": "https://cdn.discordapp.com/ephemeral-attachments/1473165768165163112/1473165838147125248/botping.zip?ex=69953819&is=6993e699&hm=30454eeb8045419114b9e0861862558d78444b8c7bf60b3366ad29ed4d05a98d&",
+    "status": "failed",
+    "message": "INVALID_MAIN",
+    "userId": "160878475333468161"
+  },
+  {
+    "id": "1771300435542-9pxaujaof",
+    "hostName": "squarecloud",
+    "appId": "failed",
+    "timestamp": 1771300435542,
+    "fileName": "https://cdn.discordapp.com/ephemeral-attachments/1473165017233887347/1473165528263561378/botping.zip?ex=699537d0&is=6993e650&hm=59ea0186c871781c46e4d5cab63ddc23a2a3308ed41101e0ad9d5ad80803135c&",
+    "status": "failed",
+    "message": "INVALID_DEPENDENCY",
+    "userId": "160878475333468161"
+  }
+]

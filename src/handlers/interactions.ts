@@ -97,11 +97,6 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
             : [{ label: 'Nenhum app', value: 'none', description: 'Faça deploy primeiro' }]
         );
 
-      const deployButton = new ButtonBuilder()
-        .setCustomId(`deploy_${hostName}`)
-        .setLabel('Deploy')
-        .setStyle(ButtonStyle.Success);
-
       const configButton = new ButtonBuilder()
         .setCustomId('open_config')
         .setLabel('Configurações')
@@ -113,7 +108,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = apps.length > 0 ? new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu) : null;
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, backButton);
 
       const components: any[] = [container];
       if (row1) components.push(row1);
@@ -143,7 +138,7 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Voltar')
         .setStyle(ButtonStyle.Secondary);
 
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, backButton);
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(backButton);
 
       await interaction.editReply({ 
         content: '',
@@ -174,12 +169,9 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
           new TextDisplayBuilder().setContent(`# ${status.name}`)
         )
         .addSeparatorComponents(new SeparatorBuilder())
-        .addSectionComponents(
-          new SectionBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`**Status:** ${status.status === 'online' ? 'ONLINE' : 'OFFLINE'}`),
-              new TextDisplayBuilder().setContent(`**ID:** \`${status.id}\``)
-            )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**Status:** ${status.status === 'online' ? 'ONLINE' : 'OFFLINE'}`),
+          new TextDisplayBuilder().setContent(`**ID:** \`${status.id}\``)
         );
 
       if (status.cpu || status.ram || status.uptime) {
@@ -194,6 +186,8 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
           new TextDisplayBuilder().setContent(metricsText.join('\n'))
         );
       }
+
+      container.addSeparatorComponents(new SeparatorBuilder());
 
       const startBtn = new ButtonBuilder()
         .setCustomId(`start_${hostName}_${appId}`)
@@ -218,19 +212,9 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setLabel('Logs')
         .setStyle(ButtonStyle.Secondary);
 
-      const migrateBtn = new ButtonBuilder()
-        .setCustomId(`migrate_${hostName}_${appId}`)
-        .setLabel('Migrar')
-        .setStyle(ButtonStyle.Primary);
-
-      const backupBtn = new ButtonBuilder()
-        .setCustomId(`backup_${hostName}_${appId}`)
-        .setLabel('Backup')
-        .setStyle(ButtonStyle.Success);
-
       const deleteBtn = new ButtonBuilder()
         .setCustomId(`delete_app_${hostName}_${appId}`)
-        .setLabel('Deletar App')
+        .setLabel('Deletar')
         .setStyle(ButtonStyle.Danger);
 
       const backBtn = new ButtonBuilder()
@@ -239,16 +223,15 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, migrateBtn, backupBtn);
-      const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteBtn, backBtn);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, deleteBtn, backBtn);
 
       await interaction.editReply({ 
         content: '',
-        components: [container, row1, row2, row3],
+        components: [container, row1, row2],
         flags: MessageFlags.IsComponentsV2
       });
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido';
+      const errorMsg = error.message || 'Erro desconhecido';
       await interaction.editReply({ content: `Erro ao buscar status: ${errorMsg}` });
     }
   }
@@ -256,6 +239,17 @@ async function handleSelectMenu(interaction: any, hostManager: HostManager, moni
 
 async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
+
+  if (action === 'quickview') {
+    const hostName = params[0];
+    const appId = params[1];
+    
+    await interaction.reply({ 
+      content: `Visualização rápida não implementada. Use o menu para gerenciar o app.`,
+      ephemeral: true 
+    });
+    return;
+  }
 
   if (action === 'open' && params[0] === 'config') {
     const hosts = configManager.getAllHosts();
@@ -661,11 +655,6 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
             : [{ label: 'Nenhum app', value: 'none', description: 'Faça deploy primeiro' }]
         );
 
-      const deployButton = new ButtonBuilder()
-        .setCustomId(`deploy_${hostName}`)
-        .setLabel('Deploy')
-        .setStyle(ButtonStyle.Success);
-
       const configButton = new ButtonBuilder()
         .setCustomId('open_config')
         .setLabel('Configurações')
@@ -677,7 +666,7 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         .setStyle(ButtonStyle.Secondary);
 
       const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(deployButton, configButton, backButton);
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(configButton, backButton);
 
       await interaction.editReply({ 
         content: '',
@@ -921,24 +910,6 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         flags: MessageFlags.IsComponentsV2
       });
     }
-  } else if (action === 'deploy') {
-    const hostName = params[0];
-    
-    const modal = new ModalBuilder()
-      .setCustomId(`deploy_confirm_${hostName}`)
-      .setTitle(`Deploy - ${hostName}`);
-
-    const confirmInput = new TextInputBuilder()
-      .setCustomId('confirm')
-      .setLabel('Digite "confirmar" para prosseguir')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('confirmar')
-      .setRequired(true);
-
-    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput);
-    modal.addComponents(row);
-
-    await interaction.showModal(modal);
   } else if (['start', 'stop', 'restart'].includes(action)) {
     const hostName = params[0];
     const appId = params[1];
@@ -960,71 +931,67 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
         await interaction.editReply({ content: result.message });
         
         setTimeout(async () => {
-          const status = await provider.getStatus(appId);
+          try {
+            const status = await provider.getStatus(appId);
 
-          const container = new ContainerBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`# ${status.name}`)
-            )
-            .addSeparatorComponents(new SeparatorBuilder())
-            .addSectionComponents(
-              new SectionBuilder()
-                .addTextDisplayComponents(
-                  new TextDisplayBuilder().setContent(`**Status:** ${status.status === 'online' ? 'ONLINE' : 'OFFLINE'}`),
-                  new TextDisplayBuilder().setContent(`**ID:** \`${status.id}\``)
-                )
-            );
+            const statusText = [
+              `**${status.name}**`,
+              ``,
+              `**Status:** ${status.status === 'online' ? 'ONLINE' : 'OFFLINE'}`,
+              `**ID:** \`${status.id}\``
+            ];
 
-          if (status.cpu || status.ram || status.uptime) {
-            container.addSeparatorComponents(new SeparatorBuilder().setDivider(false));
-            
-            const metricsText = [];
-            if (status.cpu) metricsText.push(`**CPU:** ${status.cpu}`);
-            if (status.ram) metricsText.push(`**RAM:** ${status.ram}`);
-            if (status.uptime) metricsText.push(`**Uptime:** ${status.uptime}`);
-            
-            container.addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(metricsText.join('\n'))
-            );
+            if (status.cpu || status.ram || status.uptime) {
+              statusText.push(``);
+              if (status.cpu) statusText.push(`**CPU:** ${status.cpu}`);
+              if (status.ram) statusText.push(`**RAM:** ${status.ram}`);
+              if (status.uptime) statusText.push(`**Uptime:** ${status.uptime}`);
+            }
+
+            const startBtn = new ButtonBuilder()
+              .setCustomId(`start_${hostName}_${appId}`)
+              .setLabel('Iniciar')
+              .setStyle(ButtonStyle.Success)
+              .setDisabled(status.status === 'online');
+
+            const stopBtn = new ButtonBuilder()
+              .setCustomId(`stop_${hostName}_${appId}`)
+              .setLabel('Parar')
+              .setStyle(ButtonStyle.Danger)
+              .setDisabled(status.status === 'offline');
+
+            const restartBtn = new ButtonBuilder()
+              .setCustomId(`restart_${hostName}_${appId}`)
+              .setLabel('Reiniciar')
+              .setStyle(ButtonStyle.Primary)
+              .setDisabled(status.status === 'offline');
+
+            const logsBtn = new ButtonBuilder()
+              .setCustomId(`logs_${hostName}_${appId}`)
+              .setLabel('Logs')
+              .setStyle(ButtonStyle.Secondary);
+
+            const deleteBtn = new ButtonBuilder()
+              .setCustomId(`delete_app_${hostName}_${appId}`)
+              .setLabel('Deletar')
+              .setStyle(ButtonStyle.Danger);
+
+            const backBtn = new ButtonBuilder()
+              .setCustomId(`back_host_${hostName}`)
+              .setLabel('Voltar')
+              .setStyle(ButtonStyle.Secondary);
+
+            const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
+            const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, deleteBtn, backBtn);
+
+            await interaction.editReply({ 
+              content: statusText.join('\n'),
+              components: [row1, row2]
+            });
+          } catch (error: any) {
+            console.error('Erro ao atualizar status:', error);
           }
-
-          const startBtn = new ButtonBuilder()
-            .setCustomId(`start_${hostName}_${appId}`)
-            .setLabel('Iniciar')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(status.status === 'online');
-
-          const stopBtn = new ButtonBuilder()
-            .setCustomId(`stop_${hostName}_${appId}`)
-            .setLabel('Parar')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(status.status === 'offline');
-
-          const restartBtn = new ButtonBuilder()
-            .setCustomId(`restart_${hostName}_${appId}`)
-            .setLabel('Reiniciar')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(status.status === 'offline');
-
-          const logsBtn = new ButtonBuilder()
-            .setCustomId(`logs_${hostName}_${appId}`)
-            .setLabel('Logs')
-            .setStyle(ButtonStyle.Secondary);
-
-          const backBtn = new ButtonBuilder()
-            .setCustomId(`back_host_${hostName}`)
-            .setLabel('Voltar')
-            .setStyle(ButtonStyle.Secondary);
-
-          const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(startBtn, stopBtn, restartBtn);
-          const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(logsBtn, backBtn);
-
-          await interaction.message.edit({ 
-            content: '',
-            components: [container, row1, row2],
-            flags: MessageFlags.IsComponentsV2
-          });
-        }, 2000);
+        }, 5000);
       } else {
         await interaction.editReply({ content: result.message });
       }
@@ -1350,9 +1317,9 @@ async function handleButton(interaction: any, hostManager: HostManager, configMa
 
     const confirmInput = new TextInputBuilder()
       .setCustomId('confirm')
-      .setLabel(`Digite "${appId}" para confirmar`)
+      .setLabel('Digite "DELETAR" para confirmar')
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder(appId)
+      .setPlaceholder('DELETAR')
       .setRequired(true);
 
     const row = new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput);
@@ -1386,159 +1353,7 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
   
   console.log('Modal recebido:', { customId: interaction.customId, action, type, hostName });
 
-  if (action === 'deploy' && type === 'confirm') {
-    const confirmText = interaction.fields.getTextInputValue('confirm').toLowerCase();
-    
-    if (confirmText !== 'confirmar') {
-      return interaction.reply({ content: 'Deploy cancelado', ephemeral: true });
-    }
-
-    await interaction.reply({ 
-      content: `**Deploy - ${hostName}**\n\nAgora envie o arquivo .zip do seu bot como anexo nesta mensagem.\n\nVocê tem 2 minutos.`,
-      ephemeral: true 
-    });
-
-    const filter = (m: Message) => m.author.id === interaction.user.id;
-    const collector = interaction.channel?.createMessageCollector({ filter, time: 120000, max: 1 });
-
-    collector?.on('collect', async (message: Message) => {
-      const attachment = message.attachments.first();
-
-      if (!attachment) {
-        return message.reply({ content: 'Você precisa enviar um arquivo .zip anexado' });
-      }
-
-      if (!attachment.name.endsWith('.zip')) {
-        return message.reply({ content: 'O arquivo deve ser .zip' });
-      }
-
-      await message.reply({ content: 'Processando deploy...' });
-
-      try {
-        const axios = (await import('axios')).default;
-        const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
-        let buffer = Buffer.from(response.data);
-        const fileName = attachment.name;
-
-        if (hostName === 'squarecloud') {
-          const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
-          
-          if (needsSquareCloudConfig(buffer)) {
-            await message.reply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
-            buffer = await ensureSquareCloudConfig(buffer);
-          }
-        }
-
-        const provider = hostManager.getProvider(hostName);
-        if (!provider) {
-          return message.reply({ content: 'Host não encontrada' });
-        }
-
-        const result = await provider.deploy(buffer, fileName);
-
-        if (result.success) {
-          if (deployHistoryManager) {
-            deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', attachment.url, 'success', result.message, interaction.user.id);
-          }
-          if (notificationManager) {
-            await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
-          }
-          await message.reply({ content: `Deploy realizado com sucesso!\nApp ID: \`${result.appId}\`\n${result.message}` });
-        } else {
-          if (deployHistoryManager) {
-            deployHistoryManager.addDeploy(hostName, 'failed', attachment.url, 'failed', result.message, interaction.user.id);
-          }
-          await message.reply({ content: `Erro no deploy: ${result.message}` });
-        }
-      } catch (error: any) {
-        await message.reply({ content: `Erro ao processar: ${error.message}` });
-      }
-    });
-
-    collector?.on('end', (collected: Collection<string, Message>) => {
-      if (collected.size === 0) {
-        interaction.followUp({ content: 'Tempo esgotado. Use o botão Deploy novamente.', ephemeral: true });
-      }
-    });
-  } else if (action === 'deploy' && type === 'modal') {
-    const fileUrl = interaction.fields.getTextInputValue('file_url');
-    
-    console.log('Deploy iniciado para:', hostName, 'URL:', fileUrl);
-
-    const provider = hostManager.getProvider(hostName);
-    if (!provider) {
-      console.log('Provider não encontrado para:', hostName);
-      return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
-    }
-
-    console.log('Provider encontrado:', provider.name);
-
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
-      const axios = (await import('axios')).default;
-      const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
-      let buffer = Buffer.from(response.data);
-      
-      console.log('Arquivo baixado, tamanho:', buffer.length, 'bytes');
-
-      if (hostName === 'squarecloud') {
-        console.log('É SquareCloud, verificando configuração...');
-        const { needsSquareCloudConfig, ensureSquareCloudConfig } = await import('../utils/zipHelper.js');
-        
-        if (needsSquareCloudConfig(buffer)) {
-          let mainFile: string | undefined;
-          let memory: string | undefined;
-          let displayName: string | undefined;
-
-          try {
-            mainFile = interaction.fields.getTextInputValue('main_file');
-          } catch (e) {}
-          
-          try {
-            memory = interaction.fields.getTextInputValue('memory');
-          } catch (e) {}
-          
-          try {
-            displayName = interaction.fields.getTextInputValue('display_name');
-          } catch (e) {}
-
-          const config = {
-            main: mainFile || 'index.js',
-            memory: memory ? parseInt(memory) : 512,
-            version: 'recommended',
-            displayName: displayName || 'Bot'
-          };
-
-          await interaction.editReply({ content: 'Arquivo de configuração não encontrado. Criando automaticamente...' });
-          buffer = await ensureSquareCloudConfig(buffer, config);
-          console.log('Arquivo de configuração criado:', config);
-          await interaction.editReply({ content: 'Arquivo de configuração criado. Enviando para SquareCloud...' });
-        } else {
-          console.log('Arquivo de configuração já existe no .zip');
-        }
-      }
-
-      const result = await provider.deploy(buffer, 'bot.zip');
-
-      if (result.success) {
-        if (deployHistoryManager) {
-          deployHistoryManager.addDeploy(hostName, result.appId || 'unknown', fileUrl, 'success', result.message, interaction.user.id);
-        }
-        if (notificationManager) {
-          await notificationManager.notify(interaction.user.id, 'deploy', `Deploy realizado com sucesso em ${hostName}\nApp ID: ${result.appId}`);
-        }
-        await interaction.editReply({ content: `Deploy realizado\nApp ID: \`${result.appId}\`\n${result.message}` });
-      } else {
-        if (deployHistoryManager) {
-          deployHistoryManager.addDeploy(hostName, 'failed', fileUrl, 'failed', result.message, interaction.user.id);
-        }
-        await interaction.editReply({ content: result.message });
-      }
-    } catch (error: any) {
-      await interaction.editReply({ content: `Erro: ${error.message}` });
-    }
-  } else if (action === 'config' && type === 'modal') {
+  if (action === 'config' && type === 'modal') {
     const apiToken = interaction.fields.getTextInputValue('api_token');
 
     try {
@@ -1868,7 +1683,7 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
     const appId = parts[4];
     const confirmText = interaction.fields.getTextInputValue('confirm');
 
-    if (confirmText === appId) {
+    if (confirmText === 'DELETAR') {
       const provider = hostManager.getProvider(hostNameValue);
       if (!provider) {
         return interaction.reply({ content: 'Host não encontrada', ephemeral: true });
@@ -1894,7 +1709,7 @@ async function handleModal(interaction: any, hostManager: HostManager, configMan
       }
     } else {
       await interaction.reply({ 
-        content: 'Confirmação incorreta. App não foi deletado.',
+        content: 'Confirmação incorreta. Digite "DELETAR" para confirmar.',
         ephemeral: true 
       });
     }
