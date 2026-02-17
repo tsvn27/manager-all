@@ -16,6 +16,14 @@ export async function handleModal(interaction: any, hostManager: HostManager, co
   if (action === 'config' && type === 'retention' && hostName === 'modal') {
     return handleRetentionModal(interaction, configManager);
   }
+
+  if (action === 'config' && type === 'addhost' && hostName === 'modal') {
+    return handleAddHostModal(interaction, configManager);
+  }
+
+  if (action === 'monitor' && type === 'add' && hostName === 'modal') {
+    return handleMonitorAddModal(interaction, monitorManager);
+  }
 }
 
 async function handleConfigModal(interaction: any, configManager: ConfigManager, hostName: string) {
@@ -103,4 +111,80 @@ async function handleRetentionModal(interaction: any, configManager: ConfigManag
     flags: MessageFlags.IsComponentsV2,
     ephemeral: true 
   });
+}
+
+async function handleAddHostModal(interaction: any, configManager: ConfigManager) {
+  const hostName = interaction.fields.getTextInputValue('host_name');
+  const displayName = interaction.fields.getTextInputValue('display_name');
+  const apiUrl = interaction.fields.getTextInputValue('api_url');
+
+  try {
+    configManager.addAvailableHost(hostName, displayName, apiUrl, 'CustomProvider');
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`Host ${displayName} adicionada com sucesso`)
+      );
+
+    await interaction.reply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true 
+    });
+  } catch (error: any) {
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`Erro ao adicionar host: ${error.message}`)
+      );
+
+    await interaction.reply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true 
+    });
+  }
+}
+
+async function handleMonitorAddModal(interaction: any, monitorManager: any) {
+  const hostName = interaction.fields.getTextInputValue('host_name');
+  const appId = interaction.fields.getTextInputValue('app_id');
+  const channelId = interaction.fields.getTextInputValue('channel_id');
+
+  if (!monitorManager) {
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('Monitoramento não disponível')
+      );
+    return interaction.reply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true 
+    });
+  }
+
+  try {
+    monitorManager.addMonitor(hostName, appId, channelId);
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`Monitoramento adicionado para ${hostName}/${appId}`)
+      );
+
+    await interaction.reply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true 
+    });
+  } catch (error: any) {
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`Erro ao adicionar monitoramento: ${error.message}`)
+      );
+
+    await interaction.reply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true 
+    });
+  }
 }
