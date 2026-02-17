@@ -112,20 +112,6 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     try {
-      if (!permissionManager.checkRateLimit(interaction.user.id, interaction.commandName === 'deploy' ? 'deploy' : 'command')) {
-        const resetTime = permissionManager.getRateLimitResetTime(interaction.user.id, interaction.commandName === 'deploy' ? 'deploy' : 'command');
-        const container = new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`⏱️ Rate limit excedido! Tente novamente em ${resetTime} segundos.`)
-          );
-        
-        return interaction.reply({ 
-          components: [container],
-          flags: MessageFlags.IsComponentsV2,
-          ephemeral: true 
-        });
-      }
-
       const userRoles = interaction.member?.roles && typeof interaction.member.roles !== 'string' && !Array.isArray(interaction.member.roles)
         ? Array.from(interaction.member.roles.cache.keys())
         : [];
@@ -169,22 +155,6 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      if (!permissionManager.checkRateLimit(interaction.user.id, 'command')) {
-        const resetTime = permissionManager.getRateLimitResetTime(interaction.user.id, 'command');
-        const container = new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`⏱️ Rate limit excedido! Tente novamente em ${resetTime} segundos.`)
-          );
-        
-        if (interaction.isButton() || interaction.isStringSelectMenu()) {
-          return interaction.update({ 
-            components: [container],
-            flags: MessageFlags.IsComponentsV2
-          });
-        }
-        return;
-      }
-
       await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, permissionManager, schedulerManager, webhookManager, backupManager);
     } catch (error: any) {
       console.error(error);

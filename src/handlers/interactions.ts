@@ -27,8 +27,8 @@ export async function handleInteraction(
   if (interaction.isStringSelectMenu()) {
     await handleSelectMenu(interaction, hostManager, monitorManager, migrationManager, configManager, deployHistoryManager, notificationManager, envManager);
   } else if (interaction.isButton()) {
-    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
+    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager);
   } else if (interaction.isModalSubmit()) {
-    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
+    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager);
   }
 }

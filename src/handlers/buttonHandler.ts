@@ -6,7 +6,7 @@ import { handleDashboard } from './dashboardHandlers.js';
 import { handleBackMain, handleBackHost, handleBackApp } from './navigationHandlers.js';
 import { handleMonitor, handleHistory, handleNotifications, handleSchedule, handleWebhooks, handleBackup } from './panelHandlers.js';
 
-export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any) {
+export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
   if (action === 'quickview') {
@@ -66,27 +66,27 @@ export async function handleButton(interaction: any, hostManager: HostManager, c
   }
   
   if (action === 'open' && params[0] === 'schedule') {
-    return handleSchedule(interaction);
+    return handleSchedule(interaction, schedulerManager);
   }
   
   if (action === 'schedule') {
-    return handleScheduleActions(interaction, params);
+    return handleScheduleActions(interaction, schedulerManager, params);
   }
   
   if (action === 'open' && params[0] === 'webhooks') {
-    return handleWebhooks(interaction);
+    return handleWebhooks(interaction, webhookManager);
   }
   
   if (action === 'webhook') {
-    return handleWebhookActions(interaction, params);
+    return handleWebhookActions(interaction, webhookManager, params);
   }
   
   if (action === 'open' && params[0] === 'backup') {
-    return handleBackup(interaction);
+    return handleBackup(interaction, backupManager);
   }
   
   if (action === 'backup') {
-    return handleBackupActions(interaction, params);
+    return handleBackupActions(interaction, backupManager, params);
   }
 }
 
@@ -246,6 +246,95 @@ async function handleMonitorActions(interaction: any, monitorManager: any, param
 
     await interaction.showModal(modal);
   }
+  
+  if (params[0] === 'manage') {
+    const hostName = params[1];
+    const appId = params[2];
+    
+    if (!monitorManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Monitoramento não disponível')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    const isMonitoring = monitorManager.isMonitoring(hostName, appId);
+    const autoRestart = monitorManager.getAutoRestartStatus(hostName, appId);
+
+    const { ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, MessageFlags } = await import('discord.js');
+
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`# Gerenciar Monitoramento`),
+        new TextDisplayBuilder().setContent(`**Host:** ${hostName}\n**App ID:** \`${appId}\``)
+      )
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`**Status:** ${isMonitoring ? '🟢 Ativo' : '🔴 Inativo'}`),
+        new TextDisplayBuilder().setContent(`**Auto-restart:** ${autoRestart ? '✅ Ativado' : '❌ Desativado'}`)
+      );
+
+    const toggleRestartBtn = new ButtonBuilder()
+      .setCustomId(`monitor_toggle_restart_${hostName}_${appId}`)
+      .setLabel(autoRestart ? 'Desativar Auto-restart' : 'Ativar Auto-restart')
+      .setStyle(autoRestart ? ButtonStyle.Danger : ButtonStyle.Success);
+
+    const removeBtn = new ButtonBuilder()
+      .setCustomId(`monitor_remove_${hostName}_${appId}`)
+      .setLabel('Remover Monitoramento')
+      .setStyle(ButtonStyle.Danger);
+
+    const actionRow = new ActionRowBuilder<any>()
+      .addComponents(toggleRestartBtn, removeBtn);
+
+    container.addActionRowComponents(actionRow);
+
+    const backBtn = new ButtonBuilder()
+      .setCustomId('open_monitor')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary);
+
+    const backRow = new ActionRowBuilder<any>().addComponents(backBtn);
+
+    await interaction.update({ 
+      components: [container, backRow],
+      flags: MessageFlags.IsComponentsV2
+    });
+  }
+  
+  if (params[0] === 'toggle' && params[1] === 'restart') {
+    const hostName = params[2];
+    const appId = params[3];
+    
+    if (!monitorManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Monitoramento não disponível')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    monitorManager.toggleAutoRestart(hostName, appId);
+    
+    interaction.customId = `monitor_manage_${hostName}_${appId}`;
+    return handleMonitorActions(interaction, monitorManager, ['manage', hostName, appId]);
+  }
+  
+  if (params[0] === 'remove') {
+    const hostName = params[1];
+    const appId = params[2];
+    
+    if (!monitorManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Monitoramento não disponível')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    monitorManager.stopMonitoring(hostName, appId);
+    
+    const { handleMonitor } = await import('./panelHandlers.js');
+    return handleMonitor(interaction, null, monitorManager);
+  }
 }
 
 async function handleHistoryActions(interaction: any, deployHistoryManager: any, params: string[]) {
@@ -340,50 +429,204 @@ async function handleNotificationActions(interaction: any, notificationManager: 
   }
 }
 
-async function handleScheduleActions(interaction: any, params: string[]) {
-  const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = await import('discord.js');
-  
+async function handleScheduleActions(interaction: any, schedulerManager: any, params: string[]) {
   if (params[0] === 'add') {
-    const container = new ContainerBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('Funcionalidade de agendamento em desenvolvimento')
-      );
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+    
+    const modal = new ModalBuilder()
+      .setCustomId('schedule_add_modal')
+      .setTitle('Agendar Deploy');
 
-    await interaction.update({ 
-      components: [container],
-      flags: MessageFlags.IsComponentsV2
-    });
+    const hostInput = new TextInputBuilder()
+      .setCustomId('host_name')
+      .setLabel('Nome da Host')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('squarecloud')
+      .setRequired(true);
+
+    const appInput = new TextInputBuilder()
+      .setCustomId('app_id')
+      .setLabel('ID do App')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('abc123')
+      .setRequired(true);
+
+    const fileInput = new TextInputBuilder()
+      .setCustomId('file_path')
+      .setLabel('Caminho do Arquivo')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('./app.zip')
+      .setRequired(true);
+
+    const timeInput = new TextInputBuilder()
+      .setCustomId('scheduled_time')
+      .setLabel('Data/Hora (DD/MM/YYYY HH:MM)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('25/12/2024 15:30')
+      .setRequired(true);
+
+    const recurringInput = new TextInputBuilder()
+      .setCustomId('recurring')
+      .setLabel('Recorrência (daily/weekly/monthly ou vazio)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('daily')
+      .setRequired(false);
+
+    const row1 = new ActionRowBuilder<any>().addComponents(hostInput);
+    const row2 = new ActionRowBuilder<any>().addComponents(appInput);
+    const row3 = new ActionRowBuilder<any>().addComponents(fileInput);
+    const row4 = new ActionRowBuilder<any>().addComponents(timeInput);
+    const row5 = new ActionRowBuilder<any>().addComponents(recurringInput);
+    
+    modal.addComponents(row1, row2, row3, row4, row5);
+
+    await interaction.showModal(modal);
+  }
+  
+  if (params[0] === 'cancel') {
+    if (!schedulerManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Agendamentos não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    const scheduleId = params[1];
+    const success = schedulerManager.cancelSchedule(scheduleId);
+    
+    const { handleSchedule } = await import('./panelHandlers.js');
+    return handleSchedule(interaction, schedulerManager);
   }
 }
 
-async function handleWebhookActions(interaction: any, params: string[]) {
-  const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = await import('discord.js');
-  
+async function handleWebhookActions(interaction: any, webhookManager: any, params: string[]) {
   if (params[0] === 'add') {
-    const container = new ContainerBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('Funcionalidade de webhooks em desenvolvimento')
-      );
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+    
+    const modal = new ModalBuilder()
+      .setCustomId('webhook_add_modal')
+      .setTitle('Adicionar Webhook');
 
-    await interaction.update({ 
-      components: [container],
-      flags: MessageFlags.IsComponentsV2
-    });
+    const urlInput = new TextInputBuilder()
+      .setCustomId('webhook_url')
+      .setLabel('URL do Webhook')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('https://exemplo.com/webhook')
+      .setRequired(true);
+
+    const eventsInput = new TextInputBuilder()
+      .setCustomId('events')
+      .setLabel('Eventos (separados por vírgula)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('deploy,statusChange,crash')
+      .setRequired(true);
+
+    const row1 = new ActionRowBuilder<any>().addComponents(urlInput);
+    const row2 = new ActionRowBuilder<any>().addComponents(eventsInput);
+    
+    modal.addComponents(row1, row2);
+
+    await interaction.showModal(modal);
+  }
+  
+  if (params[0] === 'toggle') {
+    if (!webhookManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Webhooks não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    const webhookId = params[1];
+    webhookManager.toggleWebhook(webhookId);
+    
+    const { handleWebhooks } = await import('./panelHandlers.js');
+    return handleWebhooks(interaction, webhookManager);
+  }
+  
+  if (params[0] === 'remove') {
+    if (!webhookManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Webhooks não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    const webhookId = params[1];
+    webhookManager.removeWebhook(webhookId);
+    
+    const { handleWebhooks } = await import('./panelHandlers.js');
+    return handleWebhooks(interaction, webhookManager);
   }
 }
 
-async function handleBackupActions(interaction: any, params: string[]) {
-  const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = await import('discord.js');
-  
+async function handleBackupActions(interaction: any, backupManager: any, params: string[]) {
   if (params[0] === 'create') {
+    if (!backupManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Backups não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    await interaction.deferUpdate();
+    
+    const result = await backupManager.createBackup();
+    
+    const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = await import('discord.js');
     const container = new ContainerBuilder()
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('Funcionalidade de backup em desenvolvimento')
+        new TextDisplayBuilder().setContent(result.message)
       );
 
-    await interaction.update({ 
+    await interaction.editReply({ 
       components: [container],
       flags: MessageFlags.IsComponentsV2
     });
+    
+    setTimeout(async () => {
+      const { handleBackup } = await import('./panelHandlers.js');
+      await handleBackup(interaction, backupManager);
+    }, 2000);
+  }
+  
+  if (params[0] === 'restore') {
+    if (!backupManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Backups não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    await interaction.deferUpdate();
+    
+    const backupId = params[1];
+    const result = await backupManager.restoreBackup(backupId);
+    
+    const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = await import('discord.js');
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(result.message)
+      );
+
+    await interaction.editReply({ 
+      components: [container],
+      flags: MessageFlags.IsComponentsV2
+    });
+  }
+  
+  if (params[0] === 'delete') {
+    if (!backupManager) {
+      return interaction.update({ 
+        components: [new (await import('discord.js')).TextDisplayBuilder().setContent('Backups não disponíveis')],
+        flags: (await import('discord.js')).MessageFlags.IsComponentsV2
+      });
+    }
+
+    const backupId = params[1];
+    backupManager.deleteBackup(backupId);
+    
+    const { handleBackup } = await import('./panelHandlers.js');
+    return handleBackup(interaction, backupManager);
   }
 }

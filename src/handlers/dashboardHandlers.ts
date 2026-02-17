@@ -97,28 +97,20 @@ export async function handleDashboard(interaction: any, hostManager: HostManager
 
     container.addSeparatorComponents(new SeparatorBuilder());
 
+    let hostStatsText = '';
     hostStats.forEach(stat => {
       if (stat.error) {
-        container.addSectionComponents(
-          new SectionBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`**${stat.name}**`),
-              new TextDisplayBuilder().setContent('Erro ao buscar dados')
-            )
-        );
+        hostStatsText += `**${stat.name}**\nErro ao buscar dados\n\n`;
       } else {
-        container.addSectionComponents(
-          new SectionBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`**${stat.name}**`),
-              new TextDisplayBuilder().setContent(
-                `Apps: ${stat.total} (${stat.online} online, ${stat.offline} offline)\n` +
-                `CPU: ${stat.avgCpu}% | RAM: ${stat.avgRam}MB`
-              )
-            )
-        );
+        hostStatsText += `**${stat.name}**\nApps: ${stat.total} (${stat.online} online, ${stat.offline} offline)\nCPU: ${stat.avgCpu}% | RAM: ${stat.avgRam}MB\n\n`;
       }
     });
+
+    if (hostStatsText) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(hostStatsText.trim())
+      );
+    }
 
     const backBtn = new ButtonBuilder()
       .setCustomId('back_main')

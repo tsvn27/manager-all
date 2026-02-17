@@ -10,6 +10,13 @@ import { handleButton } from './buttonHandler.js';
 export async function handleSelectMenu(interaction: any, hostManager: HostManager, monitorManager?: any, migrationManager?: any, configManager?: any, deployHistoryManager?: any, notificationManager?: any, envManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
+  if (action === 'select' && params[0] === 'tool') {
+    const tool = interaction.values[0];
+    const customId = `open_${tool}`;
+    interaction.customId = customId;
+    return handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
+  }
+
   if (action === 'migrate' && params[0] === 'select') {
     const fromHost = params[1];
     const appId = params[2];

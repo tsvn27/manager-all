@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags, type MessageActionRowComponentBuilder } from 'discord.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 
 export async function handleOpenConfig(interaction: any, configManager: ConfigManager) {
@@ -16,16 +16,16 @@ export async function handleOpenConfig(interaction: any, configManager: ConfigMa
       new TextDisplayBuilder().setContent('Nenhuma host disponível. Adicione uma nova host.')
     );
   } else {
-    hosts.forEach(host => {
+    hosts.forEach((host, index) => {
       const status = host.configured 
-        ? (host.enabled ? 'Configurada e Ativa' : 'Configurada e Desativada')
-        : 'Não Configurada';
+        ? (host.enabled ? '`Ativa`' : '`Desativada`')
+        : '`Não Configurada`';
       
       container.addSectionComponents(
         new SectionBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`**${host.displayName}**`),
-            new TextDisplayBuilder().setContent(`Status: ${status}`)
+            new TextDisplayBuilder().setContent(status)
           )
           .setButtonAccessory(
             new ButtonBuilder()
@@ -37,7 +37,9 @@ export async function handleOpenConfig(interaction: any, configManager: ConfigMa
     });
   }
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('config_global_settings')
       .setLabel('Configurações Globais')
@@ -45,15 +47,20 @@ export async function handleOpenConfig(interaction: any, configManager: ConfigMa
     new ButtonBuilder()
       .setCustomId('config_add_host')
       .setLabel('Adicionar Host')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('back_main')
-      .setLabel('Voltar')
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Success)
   );
 
+  container.addActionRowComponents(row);
+
+  const backBtn = new ButtonBuilder()
+    .setCustomId('back_main')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary);
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+
   await interaction.update({ 
-    components: [container, row],
+    components: [container, backRow],
     flags: MessageFlags.IsComponentsV2
   });
 }
@@ -172,7 +179,7 @@ export async function handleGlobalSettings(interaction: any, configManager: Conf
         )
     );
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('open_config')
       .setLabel('Voltar')
