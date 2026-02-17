@@ -75,8 +75,8 @@ export class NotificationManager {
         await user.send(message);
       } else if (settings.method === 'channel' && settings.channelId) {
         const channel = await this.client.channels.fetch(settings.channelId);
-        if (channel?.isTextBased()) {
-          await channel.send(message);
+        if (channel?.isTextBased() && 'send' in channel) {
+          await (channel as any).send(message);
         }
       }
     } catch (error) {

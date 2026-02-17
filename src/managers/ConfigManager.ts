@@ -103,6 +103,13 @@ export class ConfigManager {
     return this.config.hosts[hostName].enabled;
   }
 
+  enableHost(hostName: string): void {
+    if (this.config.hosts[hostName]) {
+      this.config.hosts[hostName].enabled = true;
+      this.saveConfig();
+    }
+  }
+
   isHostEnabled(hostName: string): boolean {
     return this.config.hosts[hostName]?.enabled ?? false;
   }

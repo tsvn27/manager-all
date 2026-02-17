@@ -2,6 +2,13 @@
 
 Manager completo para gerenciar bots do Discord em múltiplas hosts com interface interativa.
 
+## ✨ Novidades v1.4.0
+
+- 🔐 **Sistema de Permissões** - Controle quem pode usar o bot
+- ⏱️ **Rate Limiting** - Proteção contra spam
+- 🎨 **Components V2** - Interface moderna do Discord
+- 📚 **Documentação Completa** - Guias de instalação e uso
+
 ## Hosts Suportadas
 
 - ✅ **Discloud** - Host brasileira popular
@@ -13,91 +20,141 @@ Manager completo para gerenciar bots do Discord em múltiplas hosts com interfac
 
 ## Recursos
 
-- 🚀 Deploy automático com upload de .zip
-- 📊 Dashboard com estatísticas de todos os apps
-- 🔄 Auto-restart quando apps caem
-- 📝 Logs com filtros (erros, avisos, info)
-- 🔐 Gerenciamento de variáveis de ambiente
-- 📜 Histórico de deploys
-- 🔔 Sistema de notificações
-- 🔄 Migração entre hosts
-- ⚙️ Configurações globais
-- 📦 Backup automático antes de deploy
-
-## Instalação
-
-```bash
-npm install
-```
-
-## Configuração
-
-1. Copie `.env.example` para `.env`
-2. Preencha o token do bot:
-
-```env
-DISCORD_TOKEN=seu_token_aqui
-```
-
-3. Configure as hosts pelo painel do bot usando `/panel`
-
-## Build e Execução
-
-```bash
-npm run build
-npm start
-```
-
-## Comandos
-
-- `/panel` - Abre o painel interativo de gerenciamento
-- `/deploy` - Faz deploy com arquivo .zip anexado
-- `/dashboard` - Visualiza estatísticas de todos os apps
-
-## Painel Interativo
-
-O painel oferece interface completa com Components V2:
-
-### Gerenciamento de Apps
-- Listar todos os apps de uma host
-- Ver status detalhado (CPU, RAM, Uptime)
+### 🚀 Deploy e Gerenciamento
+- Deploy automático com upload de .zip
 - Iniciar/Parar/Reiniciar apps
 - Deletar apps com confirmação
+- Migração entre hosts
 
-### Logs Avançados
-- Visualizar logs em tempo real
-- Filtrar por tipo (Todos, Erros, Avisos, Info)
-- Buscar texto específico nos logs
+### 📊 Monitoramento
+- Dashboard com estatísticas de todos os apps
+- Auto-restart quando apps caem
+- Monitoramento em tempo real
+- Notificações em canal do Discord
 
-### Variáveis de Ambiente
+### 📝 Logs e Debug
+- Visualização de logs em tempo real
+- Filtros (Todos, Erros, Avisos, Info)
+- Busca de texto específico nos logs
+
+### 🔐 Variáveis de Ambiente
 - Adicionar/Editar/Deletar variáveis
 - Valores mascarados para segurança
 - Exportar arquivo .env
 - Auto-extração de .env do .zip no deploy
 
-### Monitoramento
-- Auto-restart quando app cai
-- Notificações em canal do Discord
-- Contador de reinicializações
+### 🔒 Segurança e Controle
+- Sistema de permissões (Admins, Usuários, Roles)
+- Rate limiting configurável
+- Comandos públicos/privados
+- Histórico de deploys
 
-### Configurações
+### ⚙️ Configurações
 - Gerenciar tokens de API das hosts
 - Ativar/Desativar hosts
 - Configurações globais de backup
 - Adicionar novas hosts customizadas
+- Backup automático antes de deploy
 
-## Estrutura do Projeto
+## 📦 Instalação Rápida
+
+```bash
+# Clone o repositório
+git clone <seu-repositorio>
+cd manigger-all
+
+# Instale as dependências
+npm install
+
+# Configure o .env
+cp .env.example .env
+# Edite .env e adicione seu DISCORD_TOKEN
+
+# Configure o primeiro admin
+# Crie permissions.json com seu User ID
+
+# Inicie o bot
+npm start
+```
+
+📖 **[Guia Completo de Instalação](INSTALL.md)**
+
+## 🎮 Comandos
+
+- `/panel` - Painel interativo de gerenciamento
+- `/deploy` - Fazer deploy de um bot (.zip anexado)
+- `/dashboard` - Ver estatísticas de todos os apps
+- `/permissions` - Gerenciar permissões (apenas admins)
+
+## 🔐 Sistema de Permissões
+
+### Níveis de Acesso
+1. **Admins** - Acesso total + gerenciar permissões
+2. **Usuários Permitidos** - Podem usar todos os comandos
+3. **Roles Permitidas** - Membros com essas roles podem usar o bot
+4. **Comandos Públicos** - Comandos que qualquer um pode usar
+
+### Rate Limits
+- Comandos: 10 por minuto por usuário
+- Deploys: 5 por hora por usuário
+
+## 📚 Documentação
+
+- [Guia de Instalação](INSTALL.md) - Instalação passo a passo
+- [Melhorias](IMPROVEMENTS.md) - Lista de melhorias implementadas
+- [Changelog](CHANGELOG.md) - Histórico de versões
+
+## 🏗️ Estrutura do Projeto
 
 ```
 src/
 ├── commands/          # Comandos slash do Discord
+│   ├── panel.ts       # Painel interativo
+│   ├── deploy.ts      # Deploy de apps
+│   ├── dashboard.ts   # Dashboard de estatísticas
+│   └── permissions.ts # Gerenciar permissões
 ├── handlers/          # Handlers de interações
+│   └── interactions.ts
 ├── managers/          # Gerenciadores de funcionalidades
+│   ├── ConfigManager.ts
+│   ├── HostManager.ts
+│   ├── MonitorManager.ts
+│   ├── PermissionManager.ts
+│   └── ...
 ├── providers/         # Providers para cada host
+│   ├── DiscloudProvider.ts
+│   ├── SquareCloudProvider.ts
+│   ├── ShardCloudProvider.ts
+│   └── ...
 ├── types/            # Tipos TypeScript
+│   └── index.ts
 └── utils/            # Utilitários
+    ├── zipHelper.ts
+    └── messageBuilder.ts
 ```
 
-## Licença
+## 🔄 Atualização
+
+```bash
+git pull
+npm install
+npm start
+```
+
+## 🐛 Troubleshooting
+
+Consulte o [Guia de Instalação](INSTALL.md#-troubleshooting) para soluções de problemas comuns.
+
+## 📝 Licença
 
 MIT
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests.
+
+## 📞 Suporte
+
+- Abra uma issue no GitHub
+- Consulte a documentação em [INSTALL.md](INSTALL.md)
+- Verifique o [CHANGELOG.md](CHANGELOG.md) para novidades

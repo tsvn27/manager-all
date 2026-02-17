@@ -2,15 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
 import { HostProvider, DeployResult, AppStatus, ActionResult, AppInfo } from '../types/index.js';
 
-/**
- * ShardCloud Provider
- * 
- * Documentação: https://docs.shardcloud.app/
- * API Base URL: https://shardcloud.app/api
- * 
- * Autenticação: Bearer token no header Authorization
- * Token pode ser gerado em: Dashboard > Config > Integrations
- */
 export class ShardCloudProvider implements HostProvider {
   name = 'ShardCloud';
   private api: AxiosInstance;

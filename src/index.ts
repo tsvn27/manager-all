@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, TextDisplayBuilder, ContainerBuilder, MessageFlags } from 'discord.js';
 import { config } from 'dotenv';
 import { HostManager } from './managers/HostManager.js';
 import { ConfigManager } from './managers/ConfigManager.js';
@@ -7,6 +7,10 @@ import { DeployHistoryManager } from './managers/DeployHistoryManager.js';
 import { NotificationManager } from './managers/NotificationManager.js';
 import { MigrationManager } from './managers/MigrationManager.js';
 import { EnvManager } from './managers/EnvManager.js';
+import { PermissionManager } from './managers/PermissionManager.js';
+import { SchedulerManager } from './managers/SchedulerManager.js';
+import { WebhookManager } from './managers/WebhookManager.js';
+import { BackupManager } from './managers/BackupManager.js';
 import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { SparkedHostProvider } from './providers/SparkedHostProvider.js';
@@ -16,21 +20,24 @@ import { ShardCloudProvider } from './providers/ShardCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
 import * as deploy from './commands/deploy.js';
-import * as dashboard from './commands/dashboard.js';
 
 config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
 const hostManager = new HostManager();
 const configManager = new ConfigManager();
 const deployHistoryManager = new DeployHistoryManager();
 const envManager = new EnvManager();
+const permissionManager = new PermissionManager();
+const schedulerManager = new SchedulerManager();
+const webhookManager = new WebhookManager();
+const backupManager = new BackupManager();
 const commands = new Collection();
 
-[panel, deploy, dashboard].forEach(cmd => {
+[panel, deploy].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -90,7 +97,7 @@ client.once('ready', async () => {
     
     await rest.put(
       Routes.applicationCommands(client.user!.id),
-      { body: Array.from(commands.values()).map(cmd => cmd.data.toJSON()) }
+      { body: Array.from(commands.values()).map((cmd: any) => cmd.data.toJSON()) }
     );
     
     console.log('Comandos registrados');
@@ -101,20 +108,58 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async interaction => {
   if (interaction.isChatInputCommand()) {
-    const command = commands.get(interaction.commandName);
+    const command: any = commands.get(interaction.commandName);
     if (!command) return;
 
     try {
+      if (!permissionManager.checkRateLimit(interaction.user.id, interaction.commandName === 'deploy' ? 'deploy' : 'command')) {
+        const resetTime = permissionManager.getRateLimitResetTime(interaction.user.id, interaction.commandName === 'deploy' ? 'deploy' : 'command');
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`⏱️ Rate limit excedido! Tente novamente em ${resetTime} segundos.`)
+          );
+        
+        return interaction.reply({ 
+          components: [container],
+          flags: MessageFlags.IsComponentsV2,
+          ephemeral: true 
+        });
+      }
+
+      const userRoles = interaction.member?.roles && typeof interaction.member.roles !== 'string' && !Array.isArray(interaction.member.roles)
+        ? Array.from(interaction.member.roles.cache.keys())
+        : [];
+      
+      if (!permissionManager.hasPermission(interaction.user.id, userRoles, interaction.commandName)) {
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent('🚫 Você não tem permissão para usar este comando.')
+          );
+        
+        return interaction.reply({ 
+          components: [container],
+          flags: MessageFlags.IsComponentsV2,
+          ephemeral: true 
+        });
+      }
+
       if (interaction.commandName === 'deploy') {
         await command.execute(interaction, hostManager, deployHistoryManager, notificationManager, envManager);
-      } else if (interaction.commandName === 'dashboard') {
-        await command.execute(interaction, hostManager);
       } else {
         await command.execute(interaction, hostManager);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      const reply = { content: 'Erro ao executar comando', ephemeral: true };
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`❌ Erro ao executar comando: ${error.message || 'Erro desconhecido'}`)
+        );
+      
+      const reply: any = { 
+        components: [container],
+        flags: MessageFlags.IsComponentsV2,
+        ephemeral: true 
+      };
       
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(reply);
@@ -124,8 +169,24 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager);
-    } catch (error) {
+      if (!permissionManager.checkRateLimit(interaction.user.id, 'command')) {
+        const resetTime = permissionManager.getRateLimitResetTime(interaction.user.id, 'command');
+        const container = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`⏱️ Rate limit excedido! Tente novamente em ${resetTime} segundos.`)
+          );
+        
+        if (interaction.isButton() || interaction.isStringSelectMenu()) {
+          return interaction.update({ 
+            components: [container],
+            flags: MessageFlags.IsComponentsV2
+          });
+        }
+        return;
+      }
+
+      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, permissionManager, schedulerManager, webhookManager, backupManager);
+    } catch (error: any) {
       console.error(error);
     }
   }
