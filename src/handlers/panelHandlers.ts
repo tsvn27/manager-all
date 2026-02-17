@@ -49,10 +49,6 @@ export async function handleMonitor(interaction: any, hostManager: any, monitorM
       .setLabel('Adicionar Monitoramento')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId('monitor_refresh')
-      .setLabel('Atualizar')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
       .setCustomId('back_main')
       .setLabel('Voltar')
       .setStyle(ButtonStyle.Secondary)
@@ -107,10 +103,6 @@ export async function handleHistory(interaction: any, deployHistoryManager: any)
   }
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId('history_refresh')
-      .setLabel('Atualizar')
-      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('back_main')
       .setLabel('Voltar')

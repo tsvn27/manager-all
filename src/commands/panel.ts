@@ -40,12 +40,6 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
     )
     .addSeparatorComponents(new SeparatorBuilder());
 
-  providers.forEach(p => {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**${p.name}**`)
-    );
-  });
-
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('select_host')
     .setPlaceholder('Escolha uma host')

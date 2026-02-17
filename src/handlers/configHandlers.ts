@@ -39,10 +39,6 @@ export async function handleOpenConfig(interaction: any, configManager: ConfigMa
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId('config_refresh')
-      .setLabel('Atualizar')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
       .setCustomId('config_global_settings')
       .setLabel('Configurações Globais')
       .setStyle(ButtonStyle.Primary),

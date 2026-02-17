@@ -120,17 +120,12 @@ export async function handleDashboard(interaction: any, hostManager: HostManager
       }
     });
 
-    const refreshBtn = new ButtonBuilder()
-      .setCustomId('open_dashboard')
-      .setLabel('Atualizar')
-      .setStyle(ButtonStyle.Primary);
-
     const backBtn = new ButtonBuilder()
       .setCustomId('back_main')
       .setLabel('Voltar')
       .setStyle(ButtonStyle.Secondary);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(refreshBtn, backBtn);
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
 
     await interaction.editReply({
       components: [container, row],
