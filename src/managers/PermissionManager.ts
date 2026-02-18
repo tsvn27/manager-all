@@ -56,6 +56,11 @@ export class PermissionManager {
       return true;
     }
 
+    const adminOnlyCommands = ['sendplans', 'sendapp', 'deploy'];
+    if (adminOnlyCommands.includes(action)) {
+      return false;
+    }
+
     if (this.permissions.publicCommands.includes(action)) {
       return true;
     }

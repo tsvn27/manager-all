@@ -4,19 +4,28 @@ Sistema completo para vender planos de hospedagem através do Discord.
 
 ## Comandos
 
-### Para Todos os Usuários
-
-- `/panel` - Painel completo com:
-  - **Minhas Apps** - Ver e gerenciar suas aplicações (ligar, desligar, reiniciar, logs, etc)
-  - **Ver Planos** - Ver planos disponíveis e comprar
-
 ### Para Administradores
 
-- `/panel` - Painel administrativo com:
+- `/panel` - Painel administrativo completo
   - **Planos** - Criar, editar, ativar/desativar planos
-  - **Pagamentos** - Configurar métodos de pagamento (PIX, MercadoPago, Stripe, PayPal)
+  - **Pagamentos** - Configurar métodos de pagamento
   - **Clientes** - Ver lista de clientes e suas aplicações
+  - Dashboard, Configurações, Monitoramento, etc.
+
 - `/deploy` - Deploy de aplicações
+
+- `/sendplans <canal>` - Envia a mensagem de planos em um canal
+  - Cria um container bonito com todos os planos ativos
+  - Usuários podem clicar em "Comprar Agora" para adquirir
+
+- `/sendapp <canal> <cliente> <appid>` - Envia o container de gerenciamento de uma aplicação
+  - Cria um container personalizado para o cliente gerenciar sua app
+  - Botões: Ligar, Desligar, Reiniciar, Ver Logs, Status, Renovar, Auto-renovar
+
+### Para Clientes
+
+- `/panel` - Acessar "Minhas Apps" para gerenciar aplicações compradas
+- Clicar nos containers enviados pelo admin para comprar planos ou gerenciar apps
 
 ## Funcionalidades
 
@@ -45,9 +54,9 @@ Sistema completo para vender planos de hospedagem através do Discord.
 - Auto-renovação opcional
 - Transferência de posse
 
-### Controle de Aplicações (Botão "Minhas Apps" no /panel)
+### Controle de Aplicações (Containers Personalizados)
 
-Clientes podem gerenciar suas aplicações:
+Admin envia containers de gerenciamento com `/sendapp`. Clientes podem:
 - **Ligar** - Iniciar aplicação
 - **Desligar** - Parar aplicação
 - **Reiniciar** - Reiniciar aplicação
@@ -112,13 +121,14 @@ Clientes podem gerenciar suas aplicações:
 
 ## Fluxo de Compra
 
-1. Cliente usa `/panel` e clica em "Minhas Apps"
-2. Se não tiver apps, clica em "Ver Planos"
-3. Escolhe o plano desejado e clica em "Comprar"
-4. Escolhe método de pagamento
+1. Admin cria planos no `/panel` > "Planos"
+2. Admin usa `/sendplans #canal-vendas` para enviar a mensagem de planos
+3. Cliente vê a mensagem e clica em "Comprar Agora" no plano desejado
+4. Cliente escolhe método de pagamento
 5. Sistema gera link/QR code de pagamento
-6. Após confirmação, aplicação é vinculada ao cliente
-7. Cliente pode gerenciar via "Minhas Apps"
+6. Após confirmação do pagamento, admin cria a aplicação na host
+7. Admin usa `/sendapp #canal-cliente @cliente appid` para enviar o container de gerenciamento
+8. Cliente gerencia sua aplicação através do container personalizado
 
 ## Expiração e Renovação
 

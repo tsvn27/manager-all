@@ -23,6 +23,8 @@ import { ShardCloudProvider } from './providers/ShardCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
 import * as deploy from './commands/deploy.js';
+import * as sendplans from './commands/sendplans.js';
+import * as sendapp from './commands/sendapp.js';
 
 config();
 
@@ -43,7 +45,7 @@ const customerManager = new CustomerManager();
 const paymentManager = new PaymentManager();
 const commands = new Collection();
 
-[panel, deploy].forEach(cmd => {
+[panel, deploy, sendplans, sendapp].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -139,6 +141,10 @@ client.on('interactionCreate', async interaction => {
 
       if (interaction.commandName === 'deploy') {
         await command.execute(interaction, hostManager, deployHistoryManager, notificationManager, envManager);
+      } else if (interaction.commandName === 'sendplans') {
+        await command.execute(interaction, planManager);
+      } else if (interaction.commandName === 'sendapp') {
+        await command.execute(interaction, customerManager, planManager);
       } else {
         await command.execute(interaction, hostManager);
       }
