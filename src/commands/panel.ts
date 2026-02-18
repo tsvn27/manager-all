@@ -94,8 +94,23 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
       .setStyle(ButtonStyle.Secondary)
   );
 
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('plans_panel')
+      .setLabel('Planos')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('payments_panel')
+      .setLabel('Pagamentos')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('customers_panel')
+      .setLabel('Clientes')
+      .setStyle(ButtonStyle.Success)
+  );
+
   await interaction.reply({ 
-    components: [container, row1, row2],
+    components: [container, row1, row2, row3],
     flags: MessageFlags.IsComponentsV2,
     ephemeral: true
   });

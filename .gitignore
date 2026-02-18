@@ -10,3 +10,6 @@ deploy-history.json
 notifications.json
 permissions.json
 backups/
+plans.json
+customers.json
+payments.json

@@ -11,6 +11,9 @@ import { PermissionManager } from './managers/PermissionManager.js';
 import { SchedulerManager } from './managers/SchedulerManager.js';
 import { WebhookManager } from './managers/WebhookManager.js';
 import { BackupManager } from './managers/BackupManager.js';
+import { PlanManager } from './managers/PlanManager.js';
+import { CustomerManager } from './managers/CustomerManager.js';
+import { PaymentManager } from './managers/PaymentManager.js';
 import { DiscloudProvider } from './providers/DiscloudProvider.js';
 import { SquareCloudProvider } from './providers/SquareCloudProvider.js';
 import { SparkedHostProvider } from './providers/SparkedHostProvider.js';
@@ -20,6 +23,8 @@ import { ShardCloudProvider } from './providers/ShardCloudProvider.js';
 import { handleInteraction } from './handlers/interactions.js';
 import * as panel from './commands/panel.js';
 import * as deploy from './commands/deploy.js';
+import * as app from './commands/app.js';
+import * as planos from './commands/planos.js';
 
 config();
 
@@ -35,9 +40,12 @@ const permissionManager = new PermissionManager();
 const schedulerManager = new SchedulerManager();
 const webhookManager = new WebhookManager();
 const backupManager = new BackupManager();
+const planManager = new PlanManager();
+const customerManager = new CustomerManager();
+const paymentManager = new PaymentManager();
 const commands = new Collection();
 
-[panel, deploy].forEach(cmd => {
+[panel, deploy, app, planos].forEach(cmd => {
   commands.set(cmd.data.name, cmd);
 });
 
@@ -131,6 +139,10 @@ client.on('interactionCreate', async interaction => {
 
       if (interaction.commandName === 'deploy') {
         await command.execute(interaction, hostManager, deployHistoryManager, notificationManager, envManager);
+      } else if (interaction.commandName === 'app') {
+        await command.execute(interaction, customerManager, configManager);
+      } else if (interaction.commandName === 'planos') {
+        await command.execute(interaction, planManager);
       } else {
         await command.execute(interaction, hostManager);
       }
@@ -155,7 +167,7 @@ client.on('interactionCreate', async interaction => {
     }
   } else {
     try {
-      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, permissionManager, schedulerManager, webhookManager, backupManager);
+      await handleInteraction(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, permissionManager, schedulerManager, webhookManager, backupManager, planManager, customerManager, paymentManager);
     } catch (error: any) {
       console.error(error);
     }

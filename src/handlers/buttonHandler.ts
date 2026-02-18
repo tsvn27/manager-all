@@ -1,28 +1,73 @@
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
-import { handleQuickview, handleManageApp, handleAppControl, handleLogs } from './appHandlers.js';
 import { handleOpenConfig, handleManageHost, handleGlobalSettings, showConfigModal } from './configHandlers.js';
 import { handleDashboard } from './dashboardHandlers.js';
 import { handleBackMain, handleBackHost, handleBackApp } from './navigationHandlers.js';
 import { handleMonitor, handleHistory, handleNotifications, handleSchedule, handleWebhooks, handleBackup } from './panelHandlers.js';
 
-export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any) {
+export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any, planManager?: any, customerManager?: any, paymentManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
-  if (action === 'quickview') {
-    return handleQuickview(interaction, hostManager, params);
+  if (action === 'plans' && params[0] === 'panel') {
+    const { handlePlansPanel } = await import('./planHandlers.js');
+    return handlePlansPanel(interaction, planManager);
   }
   
-  if (action === 'manage' && params[0] === 'app') {
-    return handleManageApp(interaction, hostManager, params);
+  if (action === 'plan') {
+    const { handleManagePlan, showPlanModal, handleTogglePlan, handleDeletePlan } = await import('./planHandlers.js');
+    if (params[0] === 'manage') return handleManagePlan(interaction, planManager, params[1]);
+    if (params[0] === 'add') return showPlanModal(interaction, false);
+    if (params[0] === 'edit') return showPlanModal(interaction, true, params[1]);
+    if (params[0] === 'toggle') return handleTogglePlan(interaction, planManager, params[1]);
+    if (params[0] === 'delete') return handleDeletePlan(interaction, planManager, params[1]);
+    if (params[0] === 'buy') {
+      const { handlePlanPurchase } = await import('./appHandlers.js');
+      return handlePlanPurchase(interaction, planManager, paymentManager, params[1]);
+    }
   }
   
-  if (action === 'start' || action === 'stop' || action === 'restart') {
-    return handleAppControl(interaction, hostManager, action, params);
+  if (action === 'payments' && params[0] === 'panel') {
+    const { handlePaymentsPanel } = await import('./paymentHandlers.js');
+    return handlePaymentsPanel(interaction, paymentManager);
   }
   
-  if (action === 'logs') {
-    return handleLogs(interaction, hostManager, params);
+  if (action === 'payment') {
+    const { handleManagePayment, showPaymentModal, handleTogglePayment, handleDeletePayment } = await import('./paymentHandlers.js');
+    if (params[0] === 'manage') return handleManagePayment(interaction, paymentManager, params[1]);
+    if (params[0] === 'add') return showPaymentModal(interaction, false);
+    if (params[0] === 'edit') return showPaymentModal(interaction, true, params[1]);
+    if (params[0] === 'toggle') return handleTogglePayment(interaction, paymentManager, params[1]);
+    if (params[0] === 'delete') return handleDeletePayment(interaction, paymentManager, params[1]);
+  }
+  
+  if (action === 'customers' && params[0] === 'panel') {
+    const { handleCustomersPanel } = await import('./customerHandlers.js');
+    return handleCustomersPanel(interaction, customerManager, planManager);
+  }
+  
+  if (action === 'customer' && params[0] === 'view') {
+    const { handleViewCustomer } = await import('./customerHandlers.js');
+    return handleViewCustomer(interaction, customerManager, planManager, params[1]);
+  }
+  
+  if (action === 'app') {
+    if (params[0] === 'manage') {
+      const { handleManageApp } = await import('../commands/app.js');
+      return handleManageApp(interaction, customerManager, configManager, params[1]);
+    }
+    
+    const { handleAppStart, handleAppStop, handleAppRestart, handleAppLogs, handleAppStatus, handleAppToggleAutoRenew, showTransferModal } = await import('./appHandlers.js');
+    if (params[0] === 'start') return handleAppStart(interaction, customerManager, configManager, params[1]);
+    if (params[0] === 'stop') return handleAppStop(interaction, customerManager, configManager, params[1]);
+    if (params[0] === 'restart') return handleAppRestart(interaction, customerManager, configManager, params[1]);
+    if (params[0] === 'logs') return handleAppLogs(interaction, customerManager, configManager, params[1]);
+    if (params[0] === 'status') return handleAppStatus(interaction, customerManager, configManager, params[1]);
+    if (params[0] === 'toggle' && params[1] === 'autorenew') return handleAppToggleAutoRenew(interaction, customerManager, params[2]);
+    if (params[0] === 'transfer') return showTransferModal(interaction, params[1]);
+    if (params[0] === 'back') {
+      const { execute } = await import('../commands/app.js');
+      return execute(interaction, customerManager, configManager);
+    }
   }
   
   if (action === 'open' && params[0] === 'config') {

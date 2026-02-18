@@ -2,8 +2,36 @@ import { ContainerBuilder, TextDisplayBuilder, MessageFlags } from 'discord.js';
 import { HostManager } from '../managers/HostManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 
-export async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any) {
+export async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any, planManager?: any, customerManager?: any, paymentManager?: any) {
   const [action, type, hostName] = interaction.customId.split('_');
+
+  if (action === 'plan' && type === 'add' && hostName === 'modal') {
+    const { handlePlanModal } = await import('./planHandlers.js');
+    return handlePlanModal(interaction, planManager, false);
+  }
+
+  if (action === 'plan' && type === 'edit' && hostName === 'modal') {
+    const planId = interaction.customId.split('_')[3];
+    const { handlePlanModal } = await import('./planHandlers.js');
+    return handlePlanModal(interaction, planManager, true, planId);
+  }
+
+  if (action === 'payment' && type === 'add' && hostName === 'modal') {
+    const { handlePaymentModal } = await import('./paymentHandlers.js');
+    return handlePaymentModal(interaction, paymentManager, false);
+  }
+
+  if (action === 'payment' && type === 'edit' && hostName === 'modal') {
+    const methodId = interaction.customId.split('_')[3];
+    const { handlePaymentModal } = await import('./paymentHandlers.js');
+    return handlePaymentModal(interaction, paymentManager, true, methodId);
+  }
+
+  if (action === 'app' && type === 'transfer' && hostName === 'modal') {
+    const appId = interaction.customId.split('_')[3];
+    const { handleTransferModal } = await import('./appHandlers.js');
+    return handleTransferModal(interaction, customerManager, appId);
+  }
 
   if (action === 'config' && type === 'modal') {
     return handleConfigModal(interaction, configManager, hostName);

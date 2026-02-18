@@ -22,13 +22,16 @@ export async function handleInteraction(
   permissionManager?: PermissionManager,
   schedulerManager?: any,
   webhookManager?: any,
-  backupManager?: any
+  backupManager?: any,
+  planManager?: any,
+  customerManager?: any,
+  paymentManager?: any
 ) {
   if (interaction.isStringSelectMenu()) {
     await handleSelectMenu(interaction, hostManager, monitorManager, migrationManager, configManager, deployHistoryManager, notificationManager, envManager);
   } else if (interaction.isButton()) {
-    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager);
+    await handleButton(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager, planManager, customerManager, paymentManager);
   } else if (interaction.isModalSubmit()) {
-    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager);
+    await handleModal(interaction, hostManager, configManager, monitorManager, deployHistoryManager, notificationManager, migrationManager, envManager, schedulerManager, webhookManager, backupManager, planManager, customerManager, paymentManager);
   }
 }
