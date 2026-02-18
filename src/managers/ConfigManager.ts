@@ -29,12 +29,22 @@ export class ConfigManager {
   constructor() {
     this.configPath = path.join(process.cwd(), 'config.json');
     this.config = this.loadConfig();
+    // Salva o config após carregar para aplicar migrações
+    this.saveConfig();
   }
 
   private loadConfig(): GlobalConfig {
     if (fs.existsSync(this.configPath)) {
       const data = fs.readFileSync(this.configPath, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      
+      // Migração automática: hosts -> adminHosts
+      if (parsed.hosts && !parsed.adminHosts) {
+        parsed.adminHosts = parsed.hosts;
+        delete parsed.hosts;
+      }
+      
+      return parsed;
     }
     return { 
       adminHosts: {},
