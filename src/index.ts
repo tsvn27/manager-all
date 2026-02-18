@@ -122,7 +122,9 @@ client.on('interactionCreate', async interaction => {
         ? Array.from(interaction.member.roles.cache.keys())
         : [];
       
-      if (!permissionManager.hasPermission(interaction.user.id, userRoles, interaction.commandName)) {
+      const guildOwnerId = interaction.guild?.ownerId;
+      
+      if (!permissionManager.hasPermission(interaction.user.id, userRoles, interaction.commandName, guildOwnerId)) {
         const container = new ContainerBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent('🚫 Você não tem permissão para usar este comando.')

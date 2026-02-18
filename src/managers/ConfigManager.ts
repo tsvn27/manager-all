@@ -1,13 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-interface Config {
-  hosts: {
+interface GlobalConfig {
+  adminHosts: {
     [key: string]: {
       apiToken: string;
       enabled: boolean;
-      displayName?: string;
-      documentation?: string;
     };
   };
   availableHosts: {
@@ -17,11 +15,6 @@ interface Config {
       providerClass: string;
     };
   };
-  monitors?: Array<{
-    hostName: string;
-    appId: string;
-    channelId: string;
-  }>;
   settings?: {
     autoBackupBeforeDeploy?: boolean;
     maxBackups?: number;
@@ -31,20 +24,20 @@ interface Config {
 
 export class ConfigManager {
   private configPath: string;
-  private config: Config;
+  private config: GlobalConfig;
 
   constructor() {
     this.configPath = path.join(process.cwd(), 'config.json');
     this.config = this.loadConfig();
   }
 
-  private loadConfig(): Config {
+  private loadConfig(): GlobalConfig {
     if (fs.existsSync(this.configPath)) {
       const data = fs.readFileSync(this.configPath, 'utf-8');
       return JSON.parse(data);
     }
     return { 
-      hosts: {},
+      adminHosts: {},
       availableHosts: {
         discloud: {
           displayName: 'Discloud',
@@ -76,6 +69,11 @@ export class ConfigManager {
           documentation: 'https://docs.shardcloud.app',
           providerClass: 'ShardCloudProvider'
         }
+      },
+      settings: {
+        autoBackupBeforeDeploy: false,
+        maxBackups: 10,
+        backupRetentionDays: 30
       }
     };
   }
@@ -85,40 +83,40 @@ export class ConfigManager {
   }
 
   setHostToken(hostName: string, apiToken: string): void {
-    if (!this.config.hosts[hostName]) {
-      this.config.hosts[hostName] = { apiToken: '', enabled: true };
+    if (!this.config.adminHosts[hostName]) {
+      this.config.adminHosts[hostName] = { apiToken: '', enabled: true };
     }
-    this.config.hosts[hostName].apiToken = apiToken;
+    this.config.adminHosts[hostName].apiToken = apiToken;
     this.saveConfig();
   }
 
   getHostToken(hostName: string): string | null {
-    return this.config.hosts[hostName]?.apiToken || null;
+    return this.config.adminHosts[hostName]?.apiToken || null;
   }
 
   toggleHost(hostName: string): boolean {
-    if (!this.config.hosts[hostName]) return false;
-    this.config.hosts[hostName].enabled = !this.config.hosts[hostName].enabled;
+    if (!this.config.adminHosts[hostName]) return false;
+    this.config.adminHosts[hostName].enabled = !this.config.adminHosts[hostName].enabled;
     this.saveConfig();
-    return this.config.hosts[hostName].enabled;
+    return this.config.adminHosts[hostName].enabled;
   }
 
   enableHost(hostName: string): void {
-    if (this.config.hosts[hostName]) {
-      this.config.hosts[hostName].enabled = true;
+    if (this.config.adminHosts[hostName]) {
+      this.config.adminHosts[hostName].enabled = true;
       this.saveConfig();
     }
   }
 
   isHostEnabled(hostName: string): boolean {
-    return this.config.hosts[hostName]?.enabled ?? false;
+    return this.config.adminHosts[hostName]?.enabled ?? false;
   }
 
   getAllHosts(): { name: string; enabled: boolean; configured: boolean; displayName: string; documentation: string }[] {
     return Object.entries(this.config.availableHosts).map(([key, hostInfo]) => ({
       name: key,
-      enabled: this.config.hosts[key]?.enabled ?? false,
-      configured: !!this.config.hosts[key]?.apiToken,
+      enabled: this.config.adminHosts[key]?.enabled ?? false,
+      configured: !!this.config.adminHosts[key]?.apiToken,
       displayName: hostInfo.displayName,
       documentation: hostInfo.documentation
     }));
@@ -135,7 +133,7 @@ export class ConfigManager {
 
   removeAvailableHost(name: string): void {
     delete this.config.availableHosts[name];
-    delete this.config.hosts[name];
+    delete this.config.adminHosts[name];
     this.saveConfig();
   }
 
@@ -144,28 +142,8 @@ export class ConfigManager {
   }
 
   removeHost(hostName: string): void {
-    delete this.config.hosts[hostName];
+    delete this.config.adminHosts[hostName];
     this.saveConfig();
-  }
-
-  addMonitor(hostName: string, appId: string, channelId: string): void {
-    if (!this.config.monitors) {
-      this.config.monitors = [];
-    }
-    this.config.monitors.push({ hostName, appId, channelId });
-    this.saveConfig();
-  }
-
-  removeMonitor(hostName: string, appId: string): void {
-    if (!this.config.monitors) return;
-    this.config.monitors = this.config.monitors.filter(
-      m => !(m.hostName === hostName && m.appId === appId)
-    );
-    this.saveConfig();
-  }
-
-  getMonitors(): Array<{ hostName: string; appId: string; channelId: string }> {
-    return this.config.monitors || [];
   }
 
   getSetting(key: 'autoBackupBeforeDeploy' | 'maxBackups' | 'backupRetentionDays'): any {
@@ -208,5 +186,33 @@ export class ConfigManager {
       this.saveConfig();
     }
     return this.config.settings;
+  }
+
+  addMonitor(hostName: string, appId: string, channelId: string): void {
+    if (!this.config.settings) {
+      this.config.settings = {
+        autoBackupBeforeDeploy: false,
+        maxBackups: 10,
+        backupRetentionDays: 30
+      };
+    }
+    if (!(this.config.settings as any).monitors) {
+      (this.config.settings as any).monitors = [];
+    }
+    (this.config.settings as any).monitors.push({ hostName, appId, channelId });
+    this.saveConfig();
+  }
+
+  removeMonitor(hostName: string, appId: string): void {
+    if (!this.config.settings || !(this.config.settings as any).monitors) return;
+    (this.config.settings as any).monitors = (this.config.settings as any).monitors.filter(
+      (m: any) => !(m.hostName === hostName && m.appId === appId)
+    );
+    this.saveConfig();
+  }
+
+  getMonitors(): Array<{ hostName: string; appId: string; channelId: string }> {
+    if (!this.config.settings || !(this.config.settings as any).monitors) return [];
+    return (this.config.settings as any).monitors || [];
   }
 }

@@ -40,12 +40,19 @@ export class PermissionManager {
     }
   }
 
-  isAdmin(userId: string): boolean {
+  isAdmin(userId: string, guildOwnerId?: string): boolean {
+    if (guildOwnerId && userId === guildOwnerId) {
+      if (!this.permissions.admins.includes(userId)) {
+        this.permissions.admins.push(userId);
+        this.savePermissions();
+      }
+      return true;
+    }
     return this.permissions.admins.includes(userId);
   }
 
-  hasPermission(userId: string, userRoles: string[], action: string): boolean {
-    if (this.isAdmin(userId)) {
+  hasPermission(userId: string, userRoles: string[], action: string, guildOwnerId?: string): boolean {
+    if (this.isAdmin(userId, guildOwnerId)) {
       return true;
     }
 
