@@ -4,10 +4,11 @@ Sistema completo para vender planos de hospedagem através do Discord.
 
 ## Comandos
 
-### Para Clientes
+### Para Todos os Usuários
 
-- `/planos` - Ver planos disponíveis e comprar
-- `/app` - Gerenciar suas aplicações (ligar, desligar, reiniciar, logs, etc)
+- `/panel` - Painel completo com:
+  - **Minhas Apps** - Ver e gerenciar suas aplicações (ligar, desligar, reiniciar, logs, etc)
+  - **Ver Planos** - Ver planos disponíveis e comprar
 
 ### Para Administradores
 
@@ -15,6 +16,7 @@ Sistema completo para vender planos de hospedagem através do Discord.
   - **Planos** - Criar, editar, ativar/desativar planos
   - **Pagamentos** - Configurar métodos de pagamento (PIX, MercadoPago, Stripe, PayPal)
   - **Clientes** - Ver lista de clientes e suas aplicações
+- `/deploy` - Deploy de aplicações
 
 ## Funcionalidades
 
@@ -43,7 +45,7 @@ Sistema completo para vender planos de hospedagem através do Discord.
 - Auto-renovação opcional
 - Transferência de posse
 
-### Controle de Aplicações (Comando /app)
+### Controle de Aplicações (Botão "Minhas Apps" no /panel)
 
 Clientes podem gerenciar suas aplicações:
 - **Ligar** - Iniciar aplicação
@@ -110,12 +112,13 @@ Clientes podem gerenciar suas aplicações:
 
 ## Fluxo de Compra
 
-1. Cliente usa `/planos` para ver planos disponíveis
-2. Clica em "Comprar" no plano desejado
-3. Escolhe método de pagamento
-4. Sistema gera link/QR code de pagamento
-5. Após confirmação, aplicação é vinculada ao cliente
-6. Cliente pode gerenciar via `/app`
+1. Cliente usa `/panel` e clica em "Minhas Apps"
+2. Se não tiver apps, clica em "Ver Planos"
+3. Escolhe o plano desejado e clica em "Comprar"
+4. Escolhe método de pagamento
+5. Sistema gera link/QR code de pagamento
+6. Após confirmação, aplicação é vinculada ao cliente
+7. Cliente pode gerenciar via "Minhas Apps"
 
 ## Expiração e Renovação
 

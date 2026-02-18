@@ -106,7 +106,11 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
     new ButtonBuilder()
       .setCustomId('customers_panel')
       .setLabel('Clientes')
-      .setStyle(ButtonStyle.Success)
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('my_apps')
+      .setLabel('Minhas Apps')
+      .setStyle(ButtonStyle.Primary)
   );
 
   await interaction.reply({ 

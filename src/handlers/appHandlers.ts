@@ -3,7 +3,66 @@ import { CustomerManager } from '../managers/CustomerManager.js';
 import { ConfigManager } from '../managers/ConfigManager.js';
 import { PlanManager } from '../managers/PlanManager.js';
 import { PaymentManager } from '../managers/PaymentManager.js';
-import { getProvider } from '../commands/app.js';
+
+export async function handleMyApps(interaction: any, customerManager: CustomerManager, configManager: ConfigManager) {
+  const userId = interaction.user.id;
+  const applications = customerManager.getCustomerApplications(userId);
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('# Minhas Aplicações')
+    )
+    .addSeparatorComponents(new SeparatorBuilder());
+
+  if (applications.length === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('Você não possui nenhuma aplicação.\n\nClique em **Ver Planos** para adquirir um plano.')
+    );
+
+    const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('view_plans')
+        .setLabel('Ver Planos')
+        .setStyle(ButtonStyle.Success)
+    );
+
+    container.addActionRowComponents(row);
+  } else {
+    applications.forEach(app => {
+      const now = Date.now();
+      const daysLeft = Math.ceil((app.expiryDate - now) / (1000 * 60 * 60 * 24));
+      const statusEmoji = app.status === 'active' ? '🟢' : app.status === 'suspended' ? '🟡' : '🔴';
+      
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`${statusEmoji} **${app.appId}**`),
+            new TextDisplayBuilder().setContent(`Host: \`${app.hostName}\``),
+            new TextDisplayBuilder().setContent(`Expira em: \`${daysLeft} dias\``),
+            new TextDisplayBuilder().setContent(`Auto-renovar: ${app.autoRenew ? '✅' : '❌'}`)
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`app_manage_${app.appId}`)
+              .setLabel('Gerenciar')
+              .setStyle(ButtonStyle.Primary)
+          )
+      );
+    });
+  }
+
+  const backBtn = new ButtonBuilder()
+    .setCustomId('back_main')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary);
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+
+  await interaction.update({
+    components: [container, backRow],
+    flags: MessageFlags.IsComponentsV2
+  });
+}
 
 export async function handleAppStart(interaction: any, customerManager: CustomerManager, configManager: ConfigManager, appId: string) {
   await interaction.deferUpdate();
@@ -253,4 +312,165 @@ export async function handlePlanPurchase(interaction: any, planManager: PlanMana
     components: [container],
     flags: MessageFlags.IsComponentsV2
   });
+}
+
+export async function handleViewPlans(interaction: any, planManager: PlanManager, paymentManager: PaymentManager) {
+  const plans = planManager.getActivePlans();
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('# Planos Disponíveis'),
+      new TextDisplayBuilder().setContent('Escolha o plano ideal para sua aplicação')
+    )
+    .addSeparatorComponents(new SeparatorBuilder());
+
+  if (plans.length === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('Nenhum plano disponível no momento.')
+    );
+  } else {
+    plans.forEach(plan => {
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${plan.name}**`),
+            new TextDisplayBuilder().setContent(`Host: \`${plan.hostName}\``),
+            new TextDisplayBuilder().setContent(`Preço: \`R$ ${plan.price.toFixed(2)}\``),
+            new TextDisplayBuilder().setContent(`Duração: \`${plan.duration} dias\``),
+            new TextDisplayBuilder().setContent(`RAM: \`${plan.resources.ram}\` | CPU: \`${plan.resources.cpu}\` | Storage: \`${plan.resources.storage}\``)
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`plan_buy_${plan.id}`)
+              .setLabel('Comprar')
+              .setStyle(ButtonStyle.Success)
+          )
+      );
+    });
+  }
+
+  const backBtn = new ButtonBuilder()
+    .setCustomId('my_apps')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary);
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+
+  await interaction.update({
+    components: [container, backRow],
+    flags: MessageFlags.IsComponentsV2
+  });
+}
+
+export async function handleManageApp(interaction: any, customerManager: CustomerManager, configManager: ConfigManager, appId: string) {
+  const userId = interaction.user.id;
+  const app = customerManager.getApplication(userId, appId);
+
+  if (!app) {
+    await interaction.reply({ content: 'Aplicação não encontrada.', ephemeral: true });
+    return;
+  }
+
+  const now = Date.now();
+  const daysLeft = Math.ceil((app.expiryDate - now) / (1000 * 60 * 60 * 24));
+  const statusEmoji = app.status === 'active' ? '🟢' : app.status === 'suspended' ? '🟡' : '🔴';
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`# Gerenciar ${appId}`)
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`${statusEmoji} **Status:** \`${app.status}\``),
+      new TextDisplayBuilder().setContent(`**Host:** \`${app.hostName}\``),
+      new TextDisplayBuilder().setContent(`**Expira em:** \`${daysLeft} dias\``),
+      new TextDisplayBuilder().setContent(`**Auto-renovar:** ${app.autoRenew ? '✅ Ativado' : '❌ Desativado'}`)
+    )
+    .addSeparatorComponents(new SeparatorBuilder());
+
+  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`app_start_${appId}`)
+      .setLabel('Ligar')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(app.status !== 'active'),
+    new ButtonBuilder()
+      .setCustomId(`app_stop_${appId}`)
+      .setLabel('Desligar')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(app.status !== 'active'),
+    new ButtonBuilder()
+      .setCustomId(`app_restart_${appId}`)
+      .setLabel('Reiniciar')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(app.status !== 'active')
+  );
+
+  const row2 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`app_logs_${appId}`)
+      .setLabel('Ver Logs')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(app.status !== 'active'),
+    new ButtonBuilder()
+      .setCustomId(`app_status_${appId}`)
+      .setLabel('Status Detalhado')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(app.status !== 'active')
+  );
+
+  const row3 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`app_renew_${appId}`)
+      .setLabel('Renovar Plano')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`app_toggle_autorenew_${appId}`)
+      .setLabel(app.autoRenew ? 'Desativar Auto-renovar' : 'Ativar Auto-renovar')
+      .setStyle(app.autoRenew ? ButtonStyle.Secondary : ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`app_transfer_${appId}`)
+      .setLabel('Transferir Posse')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  container.addActionRowComponents(row1, row2, row3);
+
+  const backBtn = new ButtonBuilder()
+    .setCustomId('my_apps')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary);
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(backBtn);
+
+  await interaction.update({
+    components: [container, backRow],
+    flags: MessageFlags.IsComponentsV2
+  });
+}
+
+export function getProvider(hostName: string, apiToken: string) {
+  const { DiscloudProvider } = require('../providers/DiscloudProvider.js');
+  const { SquareCloudProvider } = require('../providers/SquareCloudProvider.js');
+  const { ShardCloudProvider } = require('../providers/ShardCloudProvider.js');
+  const { SparkedHostProvider } = require('../providers/SparkedHostProvider.js');
+  const { RailwayProvider } = require('../providers/RailwayProvider.js');
+  const { ReplitProvider } = require('../providers/ReplitProvider.js');
+
+  switch (hostName) {
+    case 'discloud':
+      return new DiscloudProvider(apiToken);
+    case 'squarecloud':
+      return new SquareCloudProvider(apiToken);
+    case 'shardcloud':
+      return new ShardCloudProvider(apiToken);
+    case 'sparkedhost':
+      return new SparkedHostProvider(apiToken);
+    case 'railway':
+      return new RailwayProvider(apiToken);
+    case 'replit':
+      return new ReplitProvider(apiToken);
+    default:
+      return null;
+  }
 }

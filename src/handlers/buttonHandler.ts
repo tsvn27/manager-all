@@ -8,6 +8,16 @@ import { handleMonitor, handleHistory, handleNotifications, handleSchedule, hand
 export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any, planManager?: any, customerManager?: any, paymentManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
+  if (action === 'my' && params[0] === 'apps') {
+    const { handleMyApps } = await import('./appHandlers.js');
+    return handleMyApps(interaction, customerManager, configManager);
+  }
+
+  if (action === 'view' && params[0] === 'plans') {
+    const { handleViewPlans } = await import('./appHandlers.js');
+    return handleViewPlans(interaction, planManager, paymentManager);
+  }
+
   if (action === 'plans' && params[0] === 'panel') {
     const { handlePlansPanel } = await import('./planHandlers.js');
     return handlePlansPanel(interaction, planManager);
@@ -52,11 +62,11 @@ export async function handleButton(interaction: any, hostManager: HostManager, c
   
   if (action === 'app') {
     if (params[0] === 'manage') {
-      const { handleManageApp } = await import('../commands/app.js');
+      const { handleManageApp } = await import('./appHandlers.js');
       return handleManageApp(interaction, customerManager, configManager, params[1]);
     }
     
-    const { handleAppStart, handleAppStop, handleAppRestart, handleAppLogs, handleAppStatus, handleAppToggleAutoRenew, showTransferModal } = await import('./appHandlers.js');
+    const { handleAppStart, handleAppStop, handleAppRestart, handleAppLogs, handleAppStatus, handleAppToggleAutoRenew, showTransferModal, handleMyApps } = await import('./appHandlers.js');
     if (params[0] === 'start') return handleAppStart(interaction, customerManager, configManager, params[1]);
     if (params[0] === 'stop') return handleAppStop(interaction, customerManager, configManager, params[1]);
     if (params[0] === 'restart') return handleAppRestart(interaction, customerManager, configManager, params[1]);
@@ -64,10 +74,7 @@ export async function handleButton(interaction: any, hostManager: HostManager, c
     if (params[0] === 'status') return handleAppStatus(interaction, customerManager, configManager, params[1]);
     if (params[0] === 'toggle' && params[1] === 'autorenew') return handleAppToggleAutoRenew(interaction, customerManager, params[2]);
     if (params[0] === 'transfer') return showTransferModal(interaction, params[1]);
-    if (params[0] === 'back') {
-      const { execute } = await import('../commands/app.js');
-      return execute(interaction, customerManager, configManager);
-    }
+    if (params[0] === 'back') return handleMyApps(interaction, customerManager, configManager);
   }
   
   if (action === 'open' && params[0] === 'config') {
