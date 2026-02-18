@@ -8,6 +8,30 @@ import { handleMonitor, handleHistory, handleNotifications, handleSchedule, hand
 export async function handleButton(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any, planManager?: any, customerManager?: any, paymentManager?: any, permissionManager?: any) {
   const [action, ...params] = interaction.customId.split('_');
 
+  if (action === 'send' && params[0] === 'messages' && params[1] === 'panel') {
+    const { requireAdmin } = await import('../utils/adminCheck.js');
+    if (!await requireAdmin(interaction, permissionManager)) return;
+    
+    const { handleSendMessagesPanel } = await import('./sendHandlers.js');
+    return handleSendMessagesPanel(interaction);
+  }
+
+  if (action === 'send' && params[0] === 'plans' && params[1] === 'modal') {
+    const { requireAdmin } = await import('../utils/adminCheck.js');
+    if (!await requireAdmin(interaction, permissionManager)) return;
+    
+    const { showSendPlansModal } = await import('./sendHandlers.js');
+    return showSendPlansModal(interaction);
+  }
+
+  if (action === 'send' && params[0] === 'app' && params[1] === 'modal') {
+    const { requireAdmin } = await import('../utils/adminCheck.js');
+    if (!await requireAdmin(interaction, permissionManager)) return;
+    
+    const { showSendAppModal } = await import('./sendHandlers.js');
+    return showSendAppModal(interaction);
+  }
+
   if (action === 'my' && params[0] === 'apps') {
     const { handleMyApps } = await import('./appHandlers.js');
     return handleMyApps(interaction, customerManager, configManager);

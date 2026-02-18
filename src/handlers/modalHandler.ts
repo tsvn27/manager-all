@@ -5,6 +5,16 @@ import { ConfigManager } from '../managers/ConfigManager.js';
 export async function handleModal(interaction: any, hostManager: HostManager, configManager: ConfigManager, monitorManager?: any, deployHistoryManager?: any, notificationManager?: any, migrationManager?: any, envManager?: any, schedulerManager?: any, webhookManager?: any, backupManager?: any, planManager?: any, customerManager?: any, paymentManager?: any) {
   const [action, type, hostName] = interaction.customId.split('_');
 
+  if (action === 'send' && type === 'plans' && hostName === 'submit') {
+    const { handleSendPlansSubmit } = await import('./sendHandlers.js');
+    return handleSendPlansSubmit(interaction, planManager);
+  }
+
+  if (action === 'send' && type === 'app' && hostName === 'submit') {
+    const { handleSendAppSubmit } = await import('./sendHandlers.js');
+    return handleSendAppSubmit(interaction, customerManager, planManager);
+  }
+
   if (action === 'plan' && type === 'add' && hostName === 'modal') {
     const { handlePlanModal } = await import('./planHandlers.js');
     return handlePlanModal(interaction, planManager, false);

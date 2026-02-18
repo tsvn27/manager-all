@@ -108,13 +108,20 @@ export async function execute(interaction: ChatInputCommandInteraction, hostMana
       .setLabel('Clientes')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
+      .setCustomId('send_messages_panel')
+      .setLabel('Enviar Mensagens')
+      .setStyle(ButtonStyle.Success)
+  );
+
+  const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
       .setCustomId('my_apps')
       .setLabel('Minhas Apps')
       .setStyle(ButtonStyle.Primary)
   );
 
   await interaction.reply({ 
-    components: [container, row1, row2, row3],
+    components: [container, row1, row2, row3, row4],
     flags: MessageFlags.IsComponentsV2,
     ephemeral: true
   });
