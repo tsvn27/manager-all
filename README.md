@@ -2,7 +2,7 @@
 
 Manager completo para gerenciar bots do Discord em múltiplas hosts com interface interativa.
 
-## ✨ Novidades v1.4.0
+## ✨ Novidades v1.4.0,0
 
 - 🔐 **Sistema de Permissões** - Controle quem pode usar o bot
 - ⏱️ **Rate Limiting** - Proteção contra spam
