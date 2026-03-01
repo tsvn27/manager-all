@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+*.log
+config.json
+.vscode
+.env-vars.json
+env-vars.json
+deploy-history.json
+notifications.json
+permissions.json
+backups/
+plans.json
+customers.json
+payments.json
